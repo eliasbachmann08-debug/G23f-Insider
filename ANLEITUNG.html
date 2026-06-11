@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anleitung: Website online stellen</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap');
+  :root {
+    --bg: #0f0f13; --surface: #17171d; --border: #2a2a36;
+    --accent: #7c6fff; --text: #e8e8f0; --muted: #7a7a90;
+    --green: #64dc78; --yellow: #ffb432;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Space Grotesk', sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 750px; margin: 0 auto; line-height: 1.7; }
+  h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+  h2 { font-size: 1.1rem; font-weight: 600; color: var(--accent); margin: 2rem 0 0.8rem; font-family: 'Space Mono', monospace; }
+  p { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.8rem; }
+  .step-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem 1.4rem; margin-bottom: 1rem; display: flex; gap: 1rem; }
+  .step-n { font-family: 'Space Mono', monospace; font-size: 0.8rem; font-weight: 700; color: var(--accent); background: rgba(124,111,255,0.12); border: 1px solid rgba(124,111,255,0.25); width: 32px; height: 32px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-content strong { display: block; font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .step-content span { font-size: 0.83rem; color: var(--muted); }
+  code { font-family: 'Space Mono', monospace; font-size: 0.8rem; background: rgba(255,255,255,0.07); padding: 0.15rem 0.4rem; border-radius: 4px; color: #ffb432; }
+  .tip { background: rgba(100,220,120,0.07); border: 1px solid rgba(100,220,120,0.2); border-radius: 8px; padding: 0.9rem 1.1rem; font-size: 0.83rem; color: var(--muted); margin-top: 1.5rem; }
+  .tip strong { color: var(--green); }
+  a { color: var(--accent); }
+  .url-box { background: var(--surface); border: 1px solid rgba(124,111,255,0.3); border-radius: 8px; padding: 0.8rem 1.1rem; font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--accent); margin: 0.5rem 0 1rem; }
+</style>
+</head>
+<body>
+
+<h1>🚀 Website online stellen</h1>
+<p>Mit Netlify Drop ist deine Website in 2 Minuten live – kostenlos, ohne Account nötig.</p>
+
+<h2>METHODE 1 — Netlify Drop (einfachste Option, kein Account)</h2>
+
+<div class="step-block">
+  <div class="step-n">1</div>
+  <div class="step-content">
+    <strong>ZIP-Datei herunterladen</strong>
+    <span>Lade die <code>matura-website.zip</code> herunter, die du von Claude erhalten hast.</span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">2</div>
+  <div class="step-content">
+    <strong>Netlify Drop öffnen</strong>
+    <span>Gehe zu <a href="https://app.netlify.com/drop" target="_blank">app.netlify.com/drop</a></span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">3</div>
+  <div class="step-content">
+    <strong>ZIP-Ordner hochladen</strong>
+    <span>Entpacke die ZIP-Datei zuerst, dann ziehe den entpackten Ordner <code>matura-website</code> auf die Netlify-Seite (Drag & Drop).</span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">4</div>
+  <div class="step-content">
+    <strong>Fertig! Deine URL ist bereit</strong>
+    <span>Netlify gibt dir sofort eine URL wie:</span>
+  </div>
+</div>
+
+<div class="url-box">https://random-name-12345.netlify.app</div>
+
+<div class="tip">
+  <strong>✓ Tipp:</strong> Wenn du einen kostenlosen Netlify-Account erstellst, kannst du die URL umbenennen zu z.B. <code>matura-lernportal.netlify.app</code> und die Website jederzeit mit neuen Dateien aktualisieren.
+</div>
+
+<h2>METHODE 2 — Netlify mit Account (zum Aktualisieren)</h2>
+
+<div class="step-block">
+  <div class="step-n">1</div>
+  <div class="step-content">
+    <strong>Kostenlos registrieren</strong>
+    <span>Auf <a href="https://netlify.com" target="_blank">netlify.com</a> → «Sign up» → mit E-Mail oder GitHub</span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">2</div>
+  <div class="step-content">
+    <strong>«Add new site» → «Deploy manually»</strong>
+    <span>Im Dashboard auf den grünen Button klicken</span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">3</div>
+  <div class="step-content">
+    <strong>Ordner hochladen</strong>
+    <span>Den entpackten <code>matura-website</code> Ordner auf die Upload-Fläche ziehen</span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">4</div>
+  <div class="step-content">
+    <strong>URL anpassen (optional)</strong>
+    <span>Site settings → «Change site name» → z.B. <code>matura-lernportal</code></span>
+  </div>
+</div>
+
+<div class="step-block">
+  <div class="step-n">5</div>
+  <div class="step-content">
+    <strong>Aktualisieren bei neuem Fach</strong>
+    <span>Einfach neuen Ordner wieder hochladen – Netlify aktualisiert die Website automatisch.</span>
+  </div>
+</div>
+
+<div class="tip" style="margin-top:2rem;">
+  <strong>📌 Neues Fach hinzufügen:</strong> Sag Claude welches Fach du brauchst, lade deine Lernziele hoch, und du bekommst eine neue HTML-Datei. Diese kommt in den entsprechenden Ordner (<code>faecher/mathematik/</code> usw.) und du lädst den ganzen Ordner neu hoch.
+</div>
+
+</body>
+</html>
