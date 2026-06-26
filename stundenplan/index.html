@@ -185,8 +185,40 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:var(--bg);border-radius:8px;padding:.62rem 1.15rem;font-size:.83rem;z-index:500;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none;}
 .toast.show{transform:translateX(-50%) translateY(0);}
 
-@media(max-width:950px){.week-grid{grid-template-columns:repeat(4,1fr)!important;}}
-@media(max-width:600px){.week-grid{grid-template-columns:repeat(2,1fr)!important;}.month-grid{grid-template-columns:repeat(4,1fr);}.app-wrap{padding:1.5rem 1rem 4rem;}.top-actions{gap:.4rem;}}
+/* FILTER BAR */
+.filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:center;}
+.filter-label{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:.2rem;}
+.filter-chip{padding:.3rem .7rem;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.75rem;font-weight:600;cursor:pointer;transition:all .18s;}
+.filter-chip:hover{border-color:var(--accent);color:var(--accent);}
+.filter-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.filter-sep{width:1px;height:16px;background:var(--border);margin:0 .2rem;}
+
+/* HEUTE BTN */
+.heute-btn{padding:.48rem .75rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.73rem;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.03em;}
+.heute-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* TOOLTIP */
+.mini-e{position:relative;}
+.mini-e .tip{display:none;position:absolute;left:0;top:calc(100% + 4px);background:var(--text);color:var(--bg);font-size:.7rem;padding:.35rem .6rem;border-radius:6px;white-space:nowrap;z-index:50;pointer-events:none;line-height:1.4;max-width:200px;white-space:normal;}
+.mini-e:hover .tip{display:block;}
+
+/* EDIT BTN in detail */
+.det-edit{width:100%;margin-top:.55rem;padding:.62rem;background:transparent;border:1px solid rgba(139,115,85,.3);border-radius:8px;color:var(--accent);font-family:'Inter',sans-serif;font-size:.84rem;cursor:pointer;}
+.det-edit:hover{background:rgba(139,115,85,.06);}
+
+/* EDITED BADGE */
+.edited-badge{font-size:.68rem;color:var(--muted);font-style:italic;margin-top:.08rem;}
+
+/* MOBILE: hide Sa/So in week by default, show toggle */
+.week-weekend-toggle{display:none;font-size:.75rem;color:var(--accent);cursor:pointer;font-weight:600;padding:.3rem .5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);}
+@media(max-width:600px){
+  .week-weekend-toggle{display:inline-flex;align-items:center;gap:.3rem;}
+  .week-col.weekend{display:none;}
+  .week-col.weekend.show{display:block;}
+  .week-grid{grid-template-columns:repeat(5,1fr)!important;}
+  .week-grid.show-weekend{grid-template-columns:repeat(7,1fr)!important;}
+}
+@media(max-width:950px) and (min-width:601px){.week-grid{grid-template-columns:repeat(4,1fr)!important;}}
 </style>
 </head>
 <body>
@@ -247,7 +279,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
     <div class="top-bar">
       <div>
         <h1 class="page-title">📅 Stundenplan</h1>
-        <p class="page-sub">Hausaufgaben, Tests &amp; Organisatorisches – immer aktuell.</p>
+        <p class="page-sub">Hausaufgaben, Tests &amp; Organisatorisches, immer aktuell.</p>
       </div>
       <div class="top-actions">
         <div class="view-sw">
@@ -257,11 +289,22 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
         </div>
         <div class="nav-row">
           <button class="nav-btn" onclick="navigate(-1)">‹</button>
+          <button class="heute-btn" onclick="goToday()" title="Zu heute springen">Heute</button>
           <span class="period-lbl" id="period-lbl">–</span>
           <button class="nav-btn" onclick="navigate(1)">›</button>
         </div>
         <button class="btn-add" onclick="openAdd()">＋ Hinzufügen</button>
       </div>
+    </div>
+    <!-- FILTER BAR -->
+    <div class="filter-bar" id="filter-bar">
+      <span class="filter-label">Filter:</span>
+      <button class="filter-chip active" id="fc-all" onclick="setFilter('all')">Alle</button>
+      <button class="filter-chip" id="fc-hausaufgabe" onclick="setFilter('hausaufgabe')">✏️ Hausaufgaben</button>
+      <button class="filter-chip" id="fc-test" onclick="setFilter('test')">📝 Tests</button>
+      <button class="filter-chip" id="fc-organisatorisch" onclick="setFilter('organisatorisch')">📌 Organisatorisches</button>
+      <div class="filter-sep"></div>
+      <button class="week-weekend-toggle" id="weekend-toggle" onclick="toggleWeekend()" style="display:none;">Sa/So anzeigen</button>
     </div>
     <div id="view-tag"></div>
     <div id="view-woche" style="display:none;"></div>
@@ -309,7 +352,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
       <textarea class="tinp" id="inp-thema" rows="2"></textarea>
     </div>
     <div class="form-row">
-      <label class="field-label">Infos <span style="text-transform:none;letter-spacing:0;font-weight:400;font-size:.7rem;">(optional – sichtbar nach Klick)</span></label>
+      <label class="field-label">Infos <span style="text-transform:none;letter-spacing:0;font-weight:400;font-size:.7rem;">(optional)</span></label>
       <textarea class="tinp" id="inp-infos" rows="2" placeholder="z.B. Lernziele, Kapitel, Hinweise …"></textarea>
     </div>
     <div class="modal-actions">
@@ -333,7 +376,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc, getDocs, where, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const FB = {
@@ -354,10 +397,15 @@ const UCOLL = 'users';
 const CLASS_PW = 'zengatron';
 const ADMIN_EMAIL = 'eliasbachmann08@gmail.com';
 
-let entries = [], currentUser = null, currentProfile = null;
+let entries = [], prevEntryIds = null;
+let currentUser = null, currentProfile = null;
 let currentView = 'tag', cursor = new Date();
 cursor.setHours(0,0,0,0);
 let selType_ = 'hausaufgabe', unsubscribe = null;
+let activeFilter = 'all';
+let editingId = null; // id of entry being edited, null = new
+let weekendVisible = false;
+const profileCache = {};
 
 // ── SCREENS ──────────────────────────────────────────
 function show(id){
@@ -413,7 +461,7 @@ window.doAuth = async function(){
   const btn   = document.getElementById('auth-btn');
   errEl.style.display='none';
   btn.disabled=true; btn.textContent='…';
-  const ERR_MSGS = {
+  const ERR = {
     'auth/email-already-in-use':'Diese E-Mail ist bereits registriert.',
     'auth/invalid-email':'Ungültige E-Mail-Adresse.',
     'auth/weak-password':'Passwort muss mind. 6 Zeichen haben.',
@@ -427,12 +475,12 @@ window.doAuth = async function(){
       const nick = document.getElementById('inp-nick').value.trim();
       if(!nick){errEl.textContent='Bitte deinen Vornamen eingeben.';errEl.style.display='block';btn.disabled=false;btn.textContent='Registrieren →';return;}
       const cred = await createUserWithEmailAndPassword(auth,email,pw);
-      await setDoc(doc(db,UCOLL,cred.user.uid),{nickname:nick,email,createdAt:Date.now()});
+      await setDoc(doc(db,UCOLL,cred.user.uid),{nickname:nick,email,createdAt:Date.now(),photoData:null});
     } else {
       await signInWithEmailAndPassword(auth,email,pw);
     }
   } catch(e){
-    errEl.textContent = ERR_MSGS[e.code]||('Fehler: '+e.message);
+    errEl.textContent = ERR[e.code]||('Fehler: '+e.message);
     errEl.style.display='block';
     btn.disabled=false;
     btn.textContent = isReg?'Registrieren →':'Anmelden →';
@@ -445,9 +493,9 @@ onAuthStateChanged(auth, async user=>{
   if(user){
     currentUser = user;
     const snap = await getDoc(doc(db,UCOLL,user.uid));
-    currentProfile = snap.exists()?snap.data():{nickname:user.email.split('@')[0],email:user.email,createdAt:null};
+    currentProfile = snap.exists()?snap.data():{nickname:user.email.split('@')[0],email:user.email,createdAt:null,photoData:null};
     document.getElementById('chip-name').textContent = currentProfile.nickname;
-    document.getElementById('chip-av').src = avatarUrl(user.email,48);
+    document.getElementById('chip-av').src = avatarUrl(user.email);
     document.getElementById('user-chip').style.display='flex';
     document.getElementById('logout-btn').style.display='inline-block';
     show('scr-app');
@@ -462,13 +510,15 @@ onAuthStateChanged(auth, async user=>{
   }
 });
 
-window.doLogout = async function(){
-  await signOut(auth);
-  // Keep cls_ok so they only re-enter email/pw, not class password
-};
+window.doLogout = async function(){ await signOut(auth); };
 
-// ── GRAVATAR / MD5 ───────────────────────────────────
-function avatarUrl(email,s=40){return `https://www.gravatar.com/avatar/${md5((email||'').trim().toLowerCase())}?s=${s}&d=identicon`;}
+// ── AVATAR ───────────────────────────────────────────
+function avatarUrl(email, s=40){
+  if(currentProfile && currentUser && currentUser.email===email && currentProfile.photoData) return currentProfile.photoData;
+  const cached = profileCache[email];
+  if(cached && cached.photoData) return cached.photoData;
+  return `https://www.gravatar.com/avatar/${md5((email||'').trim().toLowerCase())}?s=${s}&d=identicon`;
+}
 function md5(str){
   function sa(x,y){const l=(x&0xFFFF)+(y&0xFFFF);return((x>>16)+(y>>16)+(l>>16))<<16|l&0xFFFF;}
   function rl(n,c){return n<<c|n>>>32-c;}
@@ -519,20 +569,57 @@ function fmtTs(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleDateStr
 function onDate(e,s){return e.dateTo?s>=e.date&&s<=e.dateTo:e.date===s;}
 function isAdmin(){return currentUser&&currentUser.email===ADMIN_EMAIL;}
 function canDelete(e){return isAdmin()||(e.authorUid===currentUser?.uid);}
+function filteredEntries(){return activeFilter==='all'?entries:entries.filter(e=>e.type===activeFilter);}
 
 // ── FIRESTORE ────────────────────────────────────────
 function startListening(){
   if(unsubscribe)unsubscribe();
   unsubscribe=onSnapshot(query(collection(db,COLL),orderBy('date')),snap=>{
     const today=ds(new Date());
-    entries=[];
+    const newEntries=[];
     snap.forEach(d=>{
       const e={id:d.id,...d.data()};
-      if((e.dateTo||e.date)>=today) entries.push(e);
+      if((e.dateTo||e.date)>=today) newEntries.push(e);
     });
+    // Detect new entries added by others → notification
+    if(prevEntryIds!==null){
+      newEntries.forEach(e=>{
+        if(!prevEntryIds.has(e.id) && e.authorUid!==currentUser?.uid){
+          const label=e.type==='organisatorisch'?e.thema:e.fach;
+          toast(`🔔 ${e.authorName||'Jemand'} hat „${label}" hinzugefügt`);
+        }
+      });
+    }
+    prevEntryIds=new Set(newEntries.map(e=>e.id));
+    entries=newEntries;
     render();
   },()=>toast('⚠️ Verbindungsfehler'));
 }
+
+// ── FILTER ───────────────────────────────────────────
+window.setFilter=function(f){
+  activeFilter=f;
+  ['all','hausaufgabe','test','organisatorisch'].forEach(x=>{
+    document.getElementById('fc-'+x).classList.toggle('active',x===f);
+  });
+  render();
+};
+
+// ── TODAY + WEEKEND ──────────────────────────────────
+window.goToday=function(){
+  cursor=new Date(); cursor.setHours(0,0,0,0);
+  render();
+};
+window.toggleWeekend=function(){
+  weekendVisible=!weekendVisible;
+  const grid=document.querySelector('.week-grid');
+  const btn=document.getElementById('weekend-toggle');
+  if(grid){
+    grid.classList.toggle('show-weekend',weekendVisible);
+    document.querySelectorAll('.week-col.weekend').forEach(c=>c.classList.toggle('show',weekendVisible));
+  }
+  if(btn) btn.textContent=weekendVisible?'Sa/So ausblenden':'Sa/So anzeigen';
+};
 
 // ── VIEW ─────────────────────────────────────────────
 window.setView=function(v){
@@ -541,6 +628,9 @@ window.setView=function(v){
     document.getElementById('vs-'+x).classList.toggle('active',x===v);
     document.getElementById('view-'+x).style.display=x===v?'block':'none';
   });
+  // Show weekend toggle only in week view
+  const wt=document.getElementById('weekend-toggle');
+  if(wt) wt.style.display=v==='woche'?'inline-flex':'none';
   render();
 };
 window.navigate=function(dir){
@@ -563,12 +653,13 @@ function cardHtml(e){
   const main=isOrg?`<div class="e-fach">${esc(e.thema)}</div>`
     :`<div class="e-fach">${esc(e.fach)}</div>${e.thema?`<div class="e-thema">${esc(e.thema)}</div>`:''}`;
   const span=e.dateTo?`<span class="span-badge">${fmtSh(e.date)}–${fmtSh(e.dateTo)}</span>`:'';
+  const editedBadge=e.editedBy?`<div class="edited-badge">Bearbeitet von ${esc(e.editedBy)}</div>`:'';
   const author=e.authorName?`<div class="e-meta">
     <span class="e-author" onclick="event.stopPropagation();showProf('${esc(e.authorEmail||'')}','${esc(e.authorName||'')}')">
       <img class="e-aavatar" src="${avatarUrl(e.authorEmail||'',32)}" alt="">
       <span class="e-aname">${esc(e.authorName)}</span>
-    </span>${span}</div>`:'';
-  const del=canDelete(e)?`<button class="e-del" onclick="event.stopPropagation();delEntry('${e.id}')" title="Löschen">✕</button>`:'';
+    </span>${span}</div>${editedBadge}`:'';
+  const del=canDelete(e)?`<button class="e-del" onclick="event.stopPropagation();delEntry('${e.id}','${esc(e.authorName||'')}',${e.authorUid===currentUser?.uid})" title="Löschen">✕</button>`:'';
   return `<div class="entry-card" onclick="openDetail('${e.id}')">
     <span class="etp ${e.type}">${tl}</span>
     ${main}${author}${del}
@@ -578,7 +669,7 @@ function cardHtml(e){
 function renderTag(){
   const s=ds(cursor);
   document.getElementById('period-lbl').textContent=fmtSh(s)+' '+cursor.getFullYear();
-  const de=entries.filter(e=>onDate(e,s));
+  const de=filteredEntries().filter(e=>onDate(e,s));
   const el=document.getElementById('view-tag');
   if(!de.length){el.innerHTML=`<div class="empty-state"><div class="big">📭</div><p>Keine Einträge für diesen Tag.</p></div>`;return;}
   el.innerHTML=`<div class="day-block"><div class="day-block-hdr">
@@ -593,15 +684,25 @@ function renderWoche(){
   document.getElementById('period-lbl').textContent=kw(mon)+' · '+mon.getFullYear();
   const DN=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const cols=days.map((d,i)=>{
-    const s=ds(d),today=isToday(s),de=entries.filter(e=>onDate(e,s));
-    return `<div class="week-col${today?' today':''}"><div class="week-col-hdr">
-      <div class="week-col-dn">${DN[i]}</div>
-      <div class="week-col-dt">${d.getDate()}. ${d.toLocaleDateString('de-CH',{month:'short'})}</div>
-    </div><div class="week-col-entries">
-      ${de.length?de.map(cardHtml).join(''):'<div class="week-empty">—</div>'}
-    </div></div>`;
+    const s=ds(d),today=isToday(s),de=filteredEntries().filter(e=>onDate(e,s));
+    const isWE=i>=5;
+    return `<div class="week-col${today?' today':''}${isWE?' weekend':''}${isWE&&weekendVisible?' show':''}">
+      <div class="week-col-hdr">
+        <div class="week-col-dn">${DN[i]}</div>
+        <div class="week-col-dt">${d.getDate()}. ${d.toLocaleDateString('de-CH',{month:'short'})}</div>
+      </div>
+      <div class="week-col-entries">
+        ${de.length?de.map(cardHtml).join(''):'<div class="week-empty">—</div>'}
+      </div>
+    </div>`;
   }).join('');
-  document.getElementById('view-woche').innerHTML=`<div class="week-grid" style="grid-template-columns:repeat(7,1fr)">${cols}</div>`;
+  document.getElementById('view-woche').innerHTML=`<div class="week-grid" id="week-grid-el" style="grid-template-columns:repeat(7,1fr)">${cols}</div>`;
+  // Re-apply weekend toggle state
+  if(!weekendVisible){
+    document.querySelectorAll('.week-col.weekend').forEach(c=>c.classList.remove('show'));
+    const g=document.getElementById('week-grid-el');
+    if(g) g.style.gridTemplateColumns='repeat(5,1fr)';
+  }
 }
 
 function renderMonat(){
@@ -612,11 +713,14 @@ function renderMonat(){
   ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(h=>html+=`<div class="month-hdr-cell">${h}</div>`);
   for(let i=0;i<sdow;i++) html+=`<div class="month-cell other"></div>`;
   for(let d=1;d<=dim;d++){
-    const s=ds(new Date(y,m,d)),today=isToday(s),de=entries.filter(e=>onDate(e,s));
+    const s=ds(new Date(y,m,d)),today=isToday(s),de=filteredEntries().filter(e=>onDate(e,s));
     html+=`<div class="month-cell${today?' today':''}"><div class="mcn">${d}</div>
       <div class="mc-entries">${de.map(e=>{
         const lbl=e.type==='organisatorisch'?esc(e.thema||'Org.'):esc(e.fach||'');
-        return `<div class="mini-e ${e.type}" onclick="openDetail('${e.id}')">${lbl}</div>`;
+        const tipTxt=e.type==='organisatorisch'
+          ?(e.dateTo?`${fmtSh(e.date)}–${fmtSh(e.dateTo)}`:fmtSh(e.date))
+          :`${esc(e.fach)}${e.thema?' · '+esc(e.thema):''}`;
+        return `<div class="mini-e ${e.type}" onclick="openDetail('${e.id}')">${lbl}<span class="tip">${tipTxt}${e.authorName?' · von '+esc(e.authorName):''}</span></div>`;
       }).join('')}</div></div>`;
   }
   const rem=(sdow+dim)%7;if(rem) for(let i=0;i<7-rem;i++) html+=`<div class="month-cell other"></div>`;
@@ -624,25 +728,41 @@ function renderMonat(){
   document.getElementById('view-monat').innerHTML=html;
 }
 
-// ── ADD MODAL ────────────────────────────────────────
+// ── ADD / EDIT MODAL ─────────────────────────────────
 window.openAdd=function(){
+  editingId=null;
+  document.getElementById('m-add').querySelector('.modal-title').textContent='Neuer Eintrag';
+  document.getElementById('m-add').querySelector('.btn-save-m').textContent='💾 Speichern';
   const today=ds(new Date());
-  document.getElementById('inp-date').value=ds(cursor); document.getElementById('inp-date').min=today;
-  document.getElementById('inp-dfrom').value=ds(cursor); document.getElementById('inp-dfrom').min=today;
-  document.getElementById('inp-dto').value=ds(cursor); document.getElementById('inp-dto').min=today;
+  document.getElementById('inp-date').value=today; document.getElementById('inp-date').min=today;
+  document.getElementById('inp-dfrom').value=today; document.getElementById('inp-dfrom').min=today;
+  document.getElementById('inp-dto').value=today; document.getElementById('inp-dto').min=today;
   document.getElementById('inp-thema').value='';
   document.getElementById('inp-infos').value='';
-  selType_='hausaufgabe';
-  document.getElementById('btn-ha').className='type-btn ha';
-  document.getElementById('btn-test').className='type-btn';
-  document.getElementById('btn-org').className='type-btn';
-  document.getElementById('row-fach').style.display='block';
-  document.getElementById('row-date-single').style.display='block';
-  document.getElementById('row-date-range').style.display='none';
-  document.getElementById('lbl-thema').textContent='Thema / Beschreibung';
-  document.getElementById('inp-thema').placeholder='z.B. Seite 45–52 lesen …';
+  window.selType('hausaufgabe');
   document.getElementById('m-add').classList.add('open');
 };
+
+window.openEdit=function(id){
+  const e=entries.find(x=>x.id===id); if(!e)return;
+  window.closeM('m-detail');
+  editingId=id;
+  document.getElementById('m-add').querySelector('.modal-title').textContent='Eintrag bearbeiten';
+  document.getElementById('m-add').querySelector('.btn-save-m').textContent='💾 Änderungen speichern';
+  window.selType(e.type);
+  const today=ds(new Date());
+  if(e.type==='organisatorisch'){
+    document.getElementById('inp-dfrom').value=e.date; document.getElementById('inp-dfrom').min=today;
+    document.getElementById('inp-dto').value=e.dateTo||e.date; document.getElementById('inp-dto').min=today;
+  } else {
+    document.getElementById('inp-date').value=e.date; document.getElementById('inp-date').min=today;
+  }
+  if(e.fach) document.getElementById('inp-fach').value=e.fach;
+  document.getElementById('inp-thema').value=e.thema||'';
+  document.getElementById('inp-infos').value=e.infos||'';
+  document.getElementById('m-add').classList.add('open');
+};
+
 window.selType=function(t){
   selType_=t;
   document.getElementById('btn-ha').className  =t==='hausaufgabe'    ?'type-btn ha':'type-btn';
@@ -659,7 +779,7 @@ window.closeM=function(id){document.getElementById(id).classList.remove('open');
 ['m-add','m-detail','m-profile'].forEach(id=>
   document.getElementById(id).addEventListener('click',e=>{if(e.target.id===id)window.closeM(id);}));
 
-window.saveEntry=function(){
+window.saveEntry=async function(){
   if(!currentUser||!currentProfile)return;
   const org=selType_==='organisatorisch';
   const date=org?document.getElementById('inp-dfrom').value:document.getElementById('inp-date').value;
@@ -670,15 +790,37 @@ window.saveEntry=function(){
   if(!date){toast('⚠️ Bitte ein Datum wählen');return;}
   if(org&&!thema){toast('⚠️ Bitte ein Ereignis eingeben');return;}
   if(org&&dateTo&&dateTo<date){toast('⚠️ Enddatum muss nach Startdatum liegen');return;}
-  const entry={type:selType_,date,fach,thema,infos,authorUid:currentUser.uid,authorName:currentProfile.nickname,authorEmail:currentUser.email,ts:Date.now()};
-  if(org&&dateTo)entry.dateTo=dateTo;
-  addDoc(collection(db,COLL),entry)
-    .then(()=>{window.closeM('m-add');toast('✓ Gespeichert – alle sehen es jetzt!');})
-    .catch(()=>toast('⚠️ Speichern fehlgeschlagen'));
+
+  if(editingId){
+    // EDIT existing entry
+    const orig=entries.find(x=>x.id===editingId); if(!orig)return;
+    const upd={type:selType_,date,fach,thema,infos,
+      editedBy:currentProfile.nickname, editedAt:Date.now()};
+    if(org&&dateTo) upd.dateTo=dateTo; else upd.dateTo=null;
+    try{
+      await updateDoc(doc(db,COLL,editingId),upd);
+      window.closeM('m-add');
+      toast('✓ Eintrag aktualisiert');
+    }catch(e){toast('⚠️ Speichern fehlgeschlagen');}
+  } else {
+    // NEW entry
+    const entry={type:selType_,date,fach,thema,infos,
+      authorUid:currentUser.uid,authorName:currentProfile.nickname,
+      authorEmail:currentUser.email,ts:Date.now()};
+    if(org&&dateTo) entry.dateTo=dateTo;
+    try{
+      await addDoc(collection(db,COLL),entry);
+      window.closeM('m-add');
+      toast('✓ Gespeichert – alle sehen es jetzt!');
+    }catch(e){toast('⚠️ Speichern fehlgeschlagen');}
+  }
 };
 
-window.delEntry=function(id){
-  if(!confirm('Diesen Eintrag wirklich löschen?'))return;
+window.delEntry=function(id, authorName, isOwn){
+  const msg = isOwn
+    ? 'Deinen Eintrag wirklich löschen?'
+    : `Eintrag von ${authorName} wirklich löschen?`;
+  if(!confirm(msg))return;
   deleteDoc(doc(db,COLL,id))
     .then(()=>{window.closeM('m-detail');toast('Eintrag gelöscht');})
     .catch(()=>toast('⚠️ Löschen fehlgeschlagen'));
@@ -690,18 +832,21 @@ window.openDetail=function(id){
   const org=e.type==='organisatorisch';
   const tl=e.type==='hausaufgabe'?'✏️ Hausaufgabe':e.type==='test'?'📝 Test / Prüfung':'📌 Organisatorisches';
   const dl=e.dateTo?`${fmtLong(e.date)} – ${fmtLong(e.dateTo)}`:fmtLong(e.date);
+  const editedLine=e.editedBy?`<div class="edited-badge" style="margin-bottom:.5rem;">Bearbeitet von ${esc(e.editedBy)} · ${fmtTs(e.editedAt)}</div>`:'';
   document.getElementById('m-detail-content').innerHTML=`
     <button class="mcl" onclick="closeM('m-detail')">✕</button>
     <span class="det-tpill ${e.type}">${tl}</span>
     <div class="det-fach">${org?esc(e.thema):esc(e.fach)}</div>
     <div class="det-date">${dl}</div>
+    ${editedLine}
     ${!org&&e.thema?`<div class="det-section"><div class="det-sec-lbl">Beschreibung</div><div class="det-sec-txt">${esc(e.thema)}</div></div>`:''}
     ${e.infos?`<div class="det-section"><div class="det-sec-lbl">Infos</div><div class="det-sec-txt">${esc(e.infos)}</div></div>`:''}
     <div class="det-author" onclick="showProf('${esc(e.authorEmail||'')}','${esc(e.authorName||'')}')">
       <img class="det-av" src="${avatarUrl(e.authorEmail||'',68)}" alt="">
       <div><div class="det-aname">${esc(e.authorName||'Unbekannt')}</div><div class="det-atime">Hinzugefügt ${fmtTs(e.ts)}</div></div>
     </div>
-    ${canDelete(e)?`<button class="det-del" onclick="delEntry('${e.id}')">🗑 Eintrag löschen</button>`:''}
+    ${isAdmin()?`<button class="det-edit" onclick="openEdit('${e.id}')">✏️ Bearbeiten</button>`:''}
+    ${canDelete(e)?`<button class="det-del" onclick="delEntry('${e.id}','${esc(e.authorName||'')}',${e.authorUid===currentUser?.uid})">🗑 Eintrag löschen</button>`:''}
   `;
   document.getElementById('m-detail').classList.add('open');
 };
@@ -711,13 +856,23 @@ window.showProf=async function(email,name){
   window.closeM('m-detail');
   document.getElementById('m-profile-content').innerHTML=`<div style="text-align:center;padding:2rem;color:var(--muted)">Lade…</div>`;
   document.getElementById('m-profile').classList.add('open');
-  let pd2={nickname:name,email,createdAt:null};
-  try{const snap=await getDocs(query(collection(db,UCOLL),where('email','==',email)));if(!snap.empty)pd2={...pd2,...snap.docs[0].data()};}catch(e){}
+  let pd2={nickname:name,email,createdAt:null,photoData:null};
+  try{
+    const snap=await getDocs(query(collection(db,UCOLL),where('email','==',email)));
+    if(!snap.empty){pd2={...pd2,...snap.docs[0].data()};profileCache[email]=pd2;}
+  }catch(e){}
   const isOwn=currentUser&&currentUser.email===email;
+  if(isOwn&&pd2.photoData) currentProfile.photoData=pd2.photoData;
   const joined=pd2.createdAt?'Dabei seit '+new Date(pd2.createdAt).toLocaleDateString('de-CH',{month:'long',year:'numeric'}):'';
+  const photoSrc=pd2.photoData||`https://www.gravatar.com/avatar/${md5(email.trim().toLowerCase())}?s=160&d=identicon`;
   document.getElementById('m-profile-content').innerHTML=`
     <button class="mcl" onclick="closeM('m-profile')">✕</button>
-    <img class="prof-av" src="${avatarUrl(email,160)}" alt="">
+    <div style="position:relative;width:80px;margin:0 auto ${isOwn?'.4rem':'1rem'};">
+      <img class="prof-av" id="prof-av-img" src="${photoSrc}" alt="" style="margin-bottom:0;width:80px;height:80px;">
+      ${isOwn?`<label for="prof-pic-inp" style="position:absolute;bottom:0;right:0;background:var(--accent);color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.75rem;border:2px solid var(--surface);">✎</label>
+      <input type="file" id="prof-pic-inp" accept="image/*" style="display:none;" onchange="uploadPhoto(event)">`:''}
+    </div>
+    ${isOwn?`<p style="font-size:.7rem;color:var(--muted);text-align:center;margin-bottom:.8rem;">Auf ✎ klicken um Foto zu ändern</p>`:''}
     <div class="prof-name">${esc(pd2.nickname)}</div>
     <div class="prof-email">${esc(email)}</div>
     ${joined?`<div class="prof-joined">${joined}</div>`:''}
@@ -725,9 +880,7 @@ window.showProf=async function(email,name){
       <div class="prof-edit-row" style="margin-top:1rem;">
         <input class="text-input" type="text" id="prof-nick-inp" value="${esc(pd2.nickname)}" maxlength="20" placeholder="Vorname" style="margin-bottom:0;">
         <button class="prof-save-btn" onclick="saveNick()">Speichern</button>
-      </div>
-      <p class="prof-pic-hint">Profilbild ändern: Registriere deine E-Mail auf <a href="https://gravatar.com" target="_blank">gravatar.com</a> und lade dort ein Bild hoch – es erscheint automatisch hier.</p>
-    `:''}
+      </div>`:''}
   `;
 };
 
@@ -740,7 +893,11 @@ window.saveNick=async function(){
   const newNick=document.getElementById('prof-nick-inp').value.trim();
   if(!newNick){toast('⚠️ Name darf nicht leer sein');return;}
   try{
-    await setDoc(doc(db,UCOLL,currentUser.uid),{nickname:newNick,email:currentUser.email,createdAt:currentProfile.createdAt||Date.now()});
+    await setDoc(doc(db,UCOLL,currentUser.uid),{
+      nickname:newNick,email:currentUser.email,
+      createdAt:currentProfile.createdAt||Date.now(),
+      photoData:currentProfile.photoData||null
+    });
     currentProfile.nickname=newNick;
     document.getElementById('chip-name').textContent=newNick;
     toast('✓ Name gespeichert');
@@ -748,18 +905,47 @@ window.saveNick=async function(){
   }catch(e){toast('⚠️ Fehler beim Speichern');}
 };
 
+window.uploadPhoto=async function(event){
+  const file=event.target.files[0]; if(!file)return;
+  if(file.size>2*1024*1024){toast('⚠️ Bild zu gross – max. 2 MB');return;}
+  const reader=new FileReader();
+  reader.onload=async function(ev){
+    const img=new Image();
+    img.onload=async function(){
+      const canvas=document.createElement('canvas');
+      const MAX=200; let w=img.width,h=img.height;
+      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const dataUrl=canvas.toDataURL('image/jpeg',0.82);
+      try{
+        await setDoc(doc(db,UCOLL,currentUser.uid),{
+          nickname:currentProfile.nickname,email:currentUser.email,
+          createdAt:currentProfile.createdAt||Date.now(),photoData:dataUrl
+        });
+        currentProfile.photoData=dataUrl;
+        profileCache[currentUser.email]=currentProfile;
+        document.getElementById('prof-av-img').src=dataUrl;
+        document.getElementById('chip-av').src=dataUrl;
+        toast('✓ Profilbild gespeichert');
+      }catch(err){toast('⚠️ Fehler beim Speichern des Bildes');}
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
 // ── TOAST ────────────────────────────────────────────
 function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2800);
+  setTimeout(()=>t.classList.remove('show'),3200);
 }
 window.toast=toast;
 
 // ── INIT ─────────────────────────────────────────────
-if(localStorage.getItem('cls_ok')==='1'){
-  show('scr-auth');// Firebase will auto-login if session persists
-}
+if(localStorage.getItem('cls_ok')==='1') show('scr-auth');
 </script>
+
 </body>
 </html>
