@@ -191,7 +191,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
 .filter-chip{padding:.3rem .7rem;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.75rem;font-weight:600;cursor:pointer;transition:all .18s;}
 .filter-chip:hover{border-color:var(--accent);color:var(--accent);}
 .filter-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
-.filter-sep{width:1px;height:16px;background:var(--border);margin:0 .2rem;}
+.filter-sep{display:none;}
 
 /* HEUTE BTN */
 .heute-btn{padding:.48rem .75rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.73rem;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.03em;}
@@ -210,15 +210,39 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
 .edited-badge{font-size:.68rem;color:var(--muted);font-style:italic;margin-top:.08rem;}
 
 /* MOBILE: hide Sa/So in week by default, show toggle */
-.week-weekend-toggle{display:none;font-size:.75rem;color:var(--accent);cursor:pointer;font-weight:600;padding:.3rem .5rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);}
 @media(max-width:600px){
-  .week-weekend-toggle{display:inline-flex;align-items:center;gap:.3rem;}
-  .week-col.weekend{display:none;}
-  .week-col.weekend.show{display:block;}
-  .week-grid{grid-template-columns:repeat(5,1fr)!important;}
-  .week-grid.show-weekend{grid-template-columns:repeat(7,1fr)!important;}
+  .week-grid{grid-template-columns:repeat(4,1fr)!important;}
+  .month-grid{grid-template-columns:repeat(4,1fr);}
+  .app-wrap{padding:1.5rem 1rem 4rem;}
+  .top-actions{gap:.4rem;}
 }
 @media(max-width:950px) and (min-width:601px){.week-grid{grid-template-columns:repeat(4,1fr)!important;}}
+
+/* VISIBILITY */
+.vis-toggle{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem;}
+.vis-btn{flex:1;min-width:80px;padding:.45rem .4rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:.8rem;cursor:pointer;transition:all .2s;font-weight:500;text-align:center;}
+.vis-btn.v-alle{border-color:rgba(45,122,58,.5);background:rgba(45,122,58,.08);color:var(--green);}
+.vis-btn.v-privat{border-color:rgba(184,50,50,.5);background:rgba(184,50,50,.08);color:var(--red);}
+.vis-btn.v-auswahl{border-color:rgba(37,99,235,.5);background:rgba(37,99,235,.08);color:#2563eb;}
+
+/* PERSON PICKER */
+.person-tags{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem .6rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;min-height:2.4rem;cursor:text;transition:border-color .2s;position:relative;}
+.person-tags:focus-within{border-color:var(--accent);}
+.ptag{display:inline-flex;align-items:center;gap:.3rem;background:rgba(37,99,235,.1);color:#2563eb;border:1px solid rgba(37,99,235,.25);border-radius:999px;padding:.15rem .5rem .15rem .55rem;font-size:.78rem;font-weight:600;}
+.ptag-x{background:transparent;border:none;color:#2563eb;cursor:pointer;font-size:.85rem;padding:0;line-height:1;}
+.ptag-x:hover{color:var(--red);}
+.ptag-inp{border:none;outline:none;background:transparent;font-family:'Inter',sans-serif;font-size:.85rem;color:var(--text);min-width:100px;flex:1;}
+.pdrop{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:60;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);}
+.pdrop.open{display:block;}
+.pdrop-item{padding:.55rem .85rem;font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:.55rem;transition:background .15s;}
+.pdrop-item:hover{background:var(--surface2);}
+.pdrop-av{width:22px;height:22px;border-radius:50%;object-fit:cover;}
+.pdrop-none{padding:.55rem .85rem;font-size:.8rem;color:var(--muted);}
+
+/* VIS BADGES on entries */
+.vis-badge{display:inline-flex;align-items:center;font-size:.6rem;font-weight:700;padding:.08rem .35rem;border-radius:999px;margin-left:.3rem;vertical-align:middle;}
+.vis-badge.privat{background:rgba(184,50,50,.1);color:var(--red);border:1px solid rgba(184,50,50,.2);}
+.vis-badge.auswahl{background:rgba(37,99,235,.1);color:#2563eb;border:1px solid rgba(37,99,235,.2);}
 </style>
 </head>
 <body>
@@ -304,7 +328,6 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
       <button class="filter-chip" id="fc-test" onclick="setFilter('test')">📝 Tests</button>
       <button class="filter-chip" id="fc-organisatorisch" onclick="setFilter('organisatorisch')">📌 Organisatorisches</button>
       <div class="filter-sep"></div>
-      <button class="week-weekend-toggle" id="weekend-toggle" onclick="toggleWeekend()" style="display:none;">Sa/So anzeigen</button>
     </div>
     <div id="view-tag"></div>
     <div id="view-woche" style="display:none;"></div>
@@ -355,9 +378,26 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
       <label class="field-label">Infos <span style="text-transform:none;letter-spacing:0;font-weight:400;font-size:.7rem;">(optional)</span></label>
       <textarea class="tinp" id="inp-infos" rows="2" placeholder="z.B. Lernziele, Kapitel, Hinweise …"></textarea>
     </div>
+    <div class="form-row">
+      <label class="field-label">Sichtbar für</label>
+      <div class="vis-toggle">
+        <button class="vis-btn v-alle" id="vb-alle" onclick="selVis('alle')">🌍 Alle</button>
+        <button class="vis-btn" id="vb-privat" onclick="selVis('privat')">🔒 Nur ich</button>
+        <button class="vis-btn" id="vb-auswahl" onclick="selVis('auswahl')">👥 Bestimmte</button>
+      </div>
+    </div>
+    <div class="form-row" id="row-persons" style="display:none;">
+      <label class="field-label">Personen auswählen</label>
+      <div style="position:relative;">
+        <div class="person-tags" id="person-tags" onclick="document.getElementById('ptag-inp').focus()">
+          <input class="ptag-inp" id="ptag-inp" type="text" placeholder="Vorname eingeben …" autocomplete="off">
+        </div>
+        <div class="pdrop" id="pdrop"></div>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeM('m-add')">Verwerfen</button>
-      <button class="btn-save-m" onclick="saveEntry()">💾 Speichern</button>
+      <button class="btn-save-m" id="btn-save-m" onclick="saveEntry()">💾 Speichern</button>
     </div>
   </div>
 </div>
@@ -373,6 +413,10 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
 </div>
 
 <div class="toast" id="toast"></div>
+
+<footer style="position:relative;z-index:10;text-align:center;padding:1.5rem 2rem;color:#6F675E;font-size:.78rem;border-top:1px solid #DDD5C9;margin-top:2rem;">
+  G23f-Insider · Alle Rechte vorbehalten · Fragen oder Ergänzungen? Einfach bei Elias melden
+</footer>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -403,9 +447,12 @@ let currentView = 'tag', cursor = new Date();
 cursor.setHours(0,0,0,0);
 let selType_ = 'hausaufgabe', unsubscribe = null;
 let activeFilter = 'all';
-let editingId = null; // id of entry being edited, null = new
+let editingId = null;
 let weekendVisible = false;
 const profileCache = {};
+let selVis_ = 'alle';
+let selectedPersons = [];
+let allUsers = [];
 
 // ── SCREENS ──────────────────────────────────────────
 function show(id){
@@ -499,6 +546,7 @@ onAuthStateChanged(auth, async user=>{
     document.getElementById('user-chip').style.display='flex';
     document.getElementById('logout-btn').style.display='inline-block';
     show('scr-app');
+    loadAllUsers();
     startListening();
   } else {
     currentUser=null; currentProfile=null;
@@ -569,6 +617,27 @@ function fmtTs(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleDateStr
 function onDate(e,s){return e.dateTo?s>=e.date&&s<=e.dateTo:e.date===s;}
 function isAdmin(){return currentUser&&currentUser.email===ADMIN_EMAIL;}
 function canDelete(e){return isAdmin()||(e.authorUid===currentUser?.uid);}
+
+function canSee(e){
+  if(!currentUser) return false;
+  const v = e.visibility||'alle';
+  if(v==='alle') return true;
+  if(v==='privat') return e.authorUid===currentUser.uid || isAdmin();
+  if(v==='auswahl'){
+    if(e.authorUid===currentUser.uid || isAdmin()) return true;
+    const myNick = (currentProfile?.nickname||'').toLowerCase();
+    return (e.visibleTo||[]).map(n=>n.toLowerCase()).includes(myNick);
+  }
+  return true;
+}
+
+async function loadAllUsers(){
+  try{
+    const snap = await getDocs(collection(db,UCOLL));
+    allUsers = [];
+    snap.forEach(d => allUsers.push({uid:d.id, ...d.data()}));
+  }catch(e){}
+}
 function filteredEntries(){return activeFilter==='all'?entries:entries.filter(e=>e.type===activeFilter);}
 
 // ── FIRESTORE ────────────────────────────────────────
@@ -579,7 +648,7 @@ function startListening(){
     const newEntries=[];
     snap.forEach(d=>{
       const e={id:d.id,...d.data()};
-      if((e.dateTo||e.date)>=today) newEntries.push(e);
+      if((e.dateTo||e.date)>=today && canSee(e)) newEntries.push(e);
     });
     // Detect new entries added by others → notification
     if(prevEntryIds!==null){
@@ -610,16 +679,6 @@ window.goToday=function(){
   cursor=new Date(); cursor.setHours(0,0,0,0);
   render();
 };
-window.toggleWeekend=function(){
-  weekendVisible=!weekendVisible;
-  const grid=document.querySelector('.week-grid');
-  const btn=document.getElementById('weekend-toggle');
-  if(grid){
-    grid.classList.toggle('show-weekend',weekendVisible);
-    document.querySelectorAll('.week-col.weekend').forEach(c=>c.classList.toggle('show',weekendVisible));
-  }
-  if(btn) btn.textContent=weekendVisible?'Sa/So ausblenden':'Sa/So anzeigen';
-};
 
 // ── VIEW ─────────────────────────────────────────────
 window.setView=function(v){
@@ -647,11 +706,19 @@ function render(){
   else renderMonat();
 }
 
+function visBadge(e){
+  const v=e.visibility||'alle';
+  if(v==='privat') return`<span class="vis-badge privat">🔒</span>`;
+  if(v==='auswahl') return`<span class="vis-badge auswahl">👥</span>`;
+  return'';
+}
+
 function cardHtml(e){
   const tl=e.type==='hausaufgabe'?'✏️ HA':e.type==='test'?'📝 Test':'📌 Org.';
   const isOrg=e.type==='organisatorisch';
-  const main=isOrg?`<div class="e-fach">${esc(e.thema)}</div>`
-    :`<div class="e-fach">${esc(e.fach)}</div>${e.thema?`<div class="e-thema">${esc(e.thema)}</div>`:''}`;
+  const vb=visBadge(e);
+  const main=isOrg?`<div class="e-fach">${esc(e.thema)}${vb}</div>`
+    :`<div class="e-fach">${esc(e.fach)}${vb}</div>${e.thema?`<div class="e-thema">${esc(e.thema)}</div>`:''}`;
   const span=e.dateTo?`<span class="span-badge">${fmtSh(e.date)}–${fmtSh(e.dateTo)}</span>`:'';
   const editedBadge=e.editedBy?`<div class="edited-badge">Bearbeitet von ${esc(e.editedBy)}</div>`:'';
   const author=e.authorName?`<div class="e-meta">
@@ -685,8 +752,7 @@ function renderWoche(){
   const DN=['Mo','Di','Mi','Do','Fr','Sa','So'];
   const cols=days.map((d,i)=>{
     const s=ds(d),today=isToday(s),de=filteredEntries().filter(e=>onDate(e,s));
-    const isWE=i>=5;
-    return `<div class="week-col${today?' today':''}${isWE?' weekend':''}${isWE&&weekendVisible?' show':''}">
+    return `<div class="week-col${today?' today':''}">
       <div class="week-col-hdr">
         <div class="week-col-dn">${DN[i]}</div>
         <div class="week-col-dt">${d.getDate()}. ${d.toLocaleDateString('de-CH',{month:'short'})}</div>
@@ -732,7 +798,7 @@ function renderMonat(){
 window.openAdd=function(){
   editingId=null;
   document.getElementById('m-add').querySelector('.modal-title').textContent='Neuer Eintrag';
-  document.getElementById('m-add').querySelector('.btn-save-m').textContent='💾 Speichern';
+  document.getElementById('btn-save-m').textContent='💾 Speichern';
   const today=ds(new Date());
   document.getElementById('inp-date').value=today; document.getElementById('inp-date').min=today;
   document.getElementById('inp-dfrom').value=today; document.getElementById('inp-dfrom').min=today;
@@ -740,6 +806,9 @@ window.openAdd=function(){
   document.getElementById('inp-thema').value='';
   document.getElementById('inp-infos').value='';
   window.selType('hausaufgabe');
+  // Reset visibility
+  selectedPersons=[]; renderPersonTags();
+  window.selVis('alle');
   document.getElementById('m-add').classList.add('open');
 };
 
@@ -748,7 +817,7 @@ window.openEdit=function(id){
   window.closeM('m-detail');
   editingId=id;
   document.getElementById('m-add').querySelector('.modal-title').textContent='Eintrag bearbeiten';
-  document.getElementById('m-add').querySelector('.btn-save-m').textContent='💾 Änderungen speichern';
+  document.getElementById('btn-save-m').textContent='💾 Änderungen speichern';
   window.selType(e.type);
   const today=ds(new Date());
   if(e.type==='organisatorisch'){
@@ -760,6 +829,10 @@ window.openEdit=function(id){
   if(e.fach) document.getElementById('inp-fach').value=e.fach;
   document.getElementById('inp-thema').value=e.thema||'';
   document.getElementById('inp-infos').value=e.infos||'';
+  // Restore visibility
+  selectedPersons=[...(e.visibleTo||[])];
+  renderPersonTags();
+  window.selVis(e.visibility||'alle');
   document.getElementById('m-add').classList.add('open');
 };
 
@@ -776,6 +849,74 @@ window.selType=function(t){
   document.getElementById('inp-thema').placeholder=org?'z.B. Herbstferien …':'z.B. Seite 45–52 lesen …';
 };
 window.closeM=function(id){document.getElementById(id).classList.remove('open');};
+
+// ── VISIBILITY SELECTOR ───────────────────────────────
+window.selVis=function(v){
+  selVis_=v;
+  document.getElementById('vb-alle').className   =v==='alle'    ?'vis-btn v-alle'  :'vis-btn';
+  document.getElementById('vb-privat').className =v==='privat'  ?'vis-btn v-privat':'vis-btn';
+  document.getElementById('vb-auswahl').className=v==='auswahl' ?'vis-btn v-auswahl':'vis-btn';
+  document.getElementById('row-persons').style.display=v==='auswahl'?'block':'none';
+};
+
+// ── PERSON PICKER ────────────────────────────────────
+function renderPersonTags(){
+  const container=document.getElementById('person-tags');
+  container.querySelectorAll('.ptag').forEach(t=>t.remove());
+  const inp=document.getElementById('ptag-inp');
+  selectedPersons.forEach(name=>{
+    const tag=document.createElement('span');
+    tag.className='ptag';
+    tag.innerHTML=`${esc(name)}<button class="ptag-x" onclick="removePerson('${esc(name)}')">✕</button>`;
+    container.insertBefore(tag,inp);
+  });
+}
+window.removePerson=function(name){
+  selectedPersons=selectedPersons.filter(n=>n!==name);
+  renderPersonTags();
+};
+function addPerson(name){
+  if(!name||selectedPersons.includes(name))return;
+  selectedPersons.push(name);
+  renderPersonTags();
+  document.getElementById('ptag-inp').value='';
+  document.getElementById('pdrop').classList.remove('open');
+}
+
+// Person input events
+document.addEventListener('DOMContentLoaded',()=>{
+  const inp=document.getElementById('ptag-inp');
+  if(!inp)return;
+  inp.addEventListener('input',function(){
+    const val=this.value.trim().toLowerCase();
+    const dd=document.getElementById('pdrop');
+    if(!val){dd.classList.remove('open');return;}
+    const myNick=(currentProfile?.nickname||'').toLowerCase();
+    const matches=allUsers.filter(u=>
+      u.nickname&&u.nickname.toLowerCase().includes(val)&&
+      u.nickname.toLowerCase()!==myNick&&
+      !selectedPersons.includes(u.nickname)
+    );
+    dd.innerHTML=matches.length
+      ?matches.map(u=>`<div class="pdrop-item" onclick="addPerson('${esc(u.nickname)}')"><img class="pdrop-av" src="${avatarUrl(u.email||'',44)}" alt=""><span>${esc(u.nickname)}</span></div>`).join('')
+      :`<div class="pdrop-none">Kein Nutzer gefunden</div>`;
+    dd.classList.add('open');
+  });
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const val=this.value.trim();
+      const match=allUsers.find(u=>u.nickname&&u.nickname.toLowerCase()===val.toLowerCase());
+      if(match) addPerson(match.nickname);
+      else if(val) toast('⚠️ Kein Nutzer mit diesem Namen');
+    }
+  });
+});
+document.addEventListener('click',e=>{
+  const pp=document.getElementById('pdrop');
+  const tags=document.getElementById('person-tags');
+  if(pp&&tags&&!tags.contains(e.target)) pp.classList.remove('open');
+});
 ['m-add','m-detail','m-profile'].forEach(id=>
   document.getElementById(id).addEventListener('click',e=>{if(e.target.id===id)window.closeM(id);}));
 
@@ -790,12 +931,14 @@ window.saveEntry=async function(){
   if(!date){toast('⚠️ Bitte ein Datum wählen');return;}
   if(org&&!thema){toast('⚠️ Bitte ein Ereignis eingeben');return;}
   if(org&&dateTo&&dateTo<date){toast('⚠️ Enddatum muss nach Startdatum liegen');return;}
+  if(selVis_==='auswahl'&&selectedPersons.length===0){toast('⚠️ Bitte mindestens eine Person auswählen');return;}
 
   if(editingId){
-    // EDIT existing entry
     const orig=entries.find(x=>x.id===editingId); if(!orig)return;
     const upd={type:selType_,date,fach,thema,infos,
-      editedBy:currentProfile.nickname, editedAt:Date.now()};
+      editedBy:currentProfile.nickname,editedAt:Date.now(),
+      visibility:selVis_};
+    if(selVis_==='auswahl') upd.visibleTo=selectedPersons; else upd.visibleTo=[];
     if(org&&dateTo) upd.dateTo=dateTo; else upd.dateTo=null;
     try{
       await updateDoc(doc(db,COLL,editingId),upd);
@@ -803,15 +946,17 @@ window.saveEntry=async function(){
       toast('✓ Eintrag aktualisiert');
     }catch(e){toast('⚠️ Speichern fehlgeschlagen');}
   } else {
-    // NEW entry
     const entry={type:selType_,date,fach,thema,infos,
       authorUid:currentUser.uid,authorName:currentProfile.nickname,
-      authorEmail:currentUser.email,ts:Date.now()};
+      authorEmail:currentUser.email,ts:Date.now(),
+      visibility:selVis_};
+    if(selVis_==='auswahl') entry.visibleTo=selectedPersons; else entry.visibleTo=[];
     if(org&&dateTo) entry.dateTo=dateTo;
     try{
       await addDoc(collection(db,COLL),entry);
       window.closeM('m-add');
-      toast('✓ Gespeichert – alle sehen es jetzt!');
+      const msg=selVis_==='alle'?'✓ Gespeichert – alle sehen es!':selVis_==='privat'?'✓ Gespeichert – nur du siehst es.':'✓ Gespeichert – sichtbar für: '+selectedPersons.join(', ');
+      toast(msg);
     }catch(e){toast('⚠️ Speichern fehlgeschlagen');}
   }
 };
@@ -838,6 +983,7 @@ window.openDetail=function(id){
     <span class="det-tpill ${e.type}">${tl}</span>
     <div class="det-fach">${org?esc(e.thema):esc(e.fach)}</div>
     <div class="det-date">${dl}</div>
+    ${(()=>{const v=e.visibility||'alle';return v==='privat'?'<div style="font-size:.78rem;color:var(--red);margin-bottom:.55rem;">🔒 Nur für dich sichtbar</div>':v==='auswahl'?`<div style="font-size:.78rem;color:#2563eb;margin-bottom:.55rem;">👥 Sichtbar für: ${esc((e.visibleTo||[]).join(', '))}</div>`:'';})()}
     ${editedLine}
     ${!org&&e.thema?`<div class="det-section"><div class="det-sec-lbl">Beschreibung</div><div class="det-sec-txt">${esc(e.thema)}</div></div>`:''}
     ${e.infos?`<div class="det-section"><div class="det-sec-lbl">Infos</div><div class="det-sec-txt">${esc(e.infos)}</div></div>`:''}
