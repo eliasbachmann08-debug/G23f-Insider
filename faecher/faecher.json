@@ -43,13 +43,6 @@
     "verfuegbar": false
   },
   {
-    "name": "Chemie",
-    "icon": "⚗️",
-    "color": "#c77dff",
-    "pfad": "faecher/chemie/index.html",
-    "verfuegbar": false
-  },
-  {
     "name": "Physik",
     "icon": "⚡",
     "color": "#ffb432",
