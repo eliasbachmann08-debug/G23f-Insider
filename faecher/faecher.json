@@ -4,8 +4,8 @@
     "icon": "⚔️",
     "color": "#ff6f91",
     "pfad": "faecher/geschichte/index.html",
-    "verfuegbar": true,
-    "themen": ["WWI", "Bündnisse", "Julikrise"]
+    "verfuegbar": false
+    
   },
   {
     "name": "Mathematik",
