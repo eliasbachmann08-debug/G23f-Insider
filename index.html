@@ -294,6 +294,7 @@ fetch('faecher/faecher.json')
   .then(r => r.json())
   .then(faecher => {
     const grid = document.getElementById('faecher-grid');
+    faecher.sort((a, b) => b.verfuegbar - a.verfuegbar);
     grid.innerHTML = faecher.map(f => {
       if (f.verfuegbar) {
         const pills = (f.themen||[]).map(t => `<span class="topic-pill">${t}</span>`).join('');
