@@ -284,147 +284,48 @@
       </a></div></section>
 <main class="section">
   <div class="section-title">Fächer</div>
-
-  <div class="subject-grid">
-
-    <a href="faecher/geschichte/index.html" class="subject-card" style="--card-color:#ff6f91;">
-      <div class="card-top">
-        <div class="card-icon">⚔️</div>
-        <div class="card-tag ready">✓ Verfügbar</div>
-      </div>
-      <div class="card-body">
-        <h3>Geschichte</h3>
-        <p>Erster Weltkrieg bereits verfügbar. Weitere Themen folgen.</p>
-      </div>
-    </a>
-
-
-    <div class="subject-card inactive" style="--card-color:#8B7355;">
-      <div class="card-top">
-        <div class="card-icon">📐</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Mathematik</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#ff9f40;">
-      <div class="card-top">
-        <div class="card-icon">📖</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Deutsch</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#00d4ff;">
-      <div class="card-top">
-        <div class="card-icon">🇫🇷</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Französisch</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#64dc78;">
-      <div class="card-top">
-        <div class="card-icon">🇬🇧</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Englisch</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#ff6f91;">
-      <div class="card-top">
-        <div class="card-icon">🧬</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Biologie</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#c77dff;">
-      <div class="card-top">
-        <div class="card-icon">⚗️</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Chemie</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#ffb432;">
-      <div class="card-top">
-        <div class="card-icon">⚡</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Physik</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#00d4ff;">
-      <div class="card-top">
-        <div class="card-icon">🌍</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Geografie</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#8B7355;">
-      <div class="card-top">
-        <div class="card-icon">🧠</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Philosophie</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
- 
-    <div class="subject-card inactive" style="--card-color:#ff9f40;">
-      <div class="card-top">
-        <div class="card-icon">📊</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Schwerpunktfach Mathe</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
-    <div class="subject-card inactive" style="--card-color:#c77dff;">
-      <div class="card-top">
-        <div class="card-icon">🔭</div>
-        <div class="card-tag soon">Bald</div>
-      </div>
-      <div class="card-body">
-        <h3>Schwerpunktfach Physik</h3>
-        <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
-      </div>
-    </div>
-
+  <div class="subject-grid" id="faecher-grid">
+    <div style="color:var(--muted);font-size:.85rem;padding:1rem;">Lädt…</div>
   </div>
 </main>
 
-
+<script>
+fetch('faecher/faecher.json')
+  .then(r => r.json())
+  .then(faecher => {
+    const grid = document.getElementById('faecher-grid');
+    grid.innerHTML = faecher.map(f => {
+      if (f.verfuegbar) {
+        const pills = (f.themen||[]).map(t => `<span class="topic-pill">${t}</span>`).join('');
+        return `<a href="${f.pfad}" class="subject-card" style="--card-color:${f.color};">
+          <div class="card-top">
+            <div class="card-icon">${f.icon}</div>
+            <div class="card-tag ready">✓ Verfügbar</div>
+          </div>
+          <div class="card-body">
+            <h3>${f.name}</h3>
+            <p>${f.beschreibung || 'Lernmaterial verfügbar.'}</p>
+          </div>
+          ${pills ? `<div class="card-footer">${pills}</div>` : ''}
+        </a>`;
+      } else {
+        return `<div class="subject-card inactive" style="--card-color:${f.color};">
+          <div class="card-top">
+            <div class="card-icon">${f.icon}</div>
+            <div class="card-tag soon">Bald</div>
+          </div>
+          <div class="card-body">
+            <h3>${f.name}</h3>
+            <p>Themen werden hinzugefügt, sobald wir sie in der Schule behandeln.</p>
+          </div>
+        </div>`;
+      }
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('faecher-grid').innerHTML = '<div style="color:var(--muted);font-size:.85rem;">Fächer konnten nicht geladen werden.</div>';
+  });
+</script>
 
 <footer>
   G23f-Insider · Alle Rechte vorbehalten · Fragen oder Ergänzungen? Einfach bei Elias melden
