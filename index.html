@@ -50,6 +50,48 @@ header {
 }
 .nav-links a:hover { color: var(--text); }
 
+/* ── INSTALL BUTTON ── */
+.install-btn {
+  display: none;
+  align-items: center; gap: .4rem;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  padding: .42rem .85rem;
+  font-family: 'Inter', sans-serif;
+  font-size: .78rem; font-weight: 600;
+  cursor: pointer; transition: opacity .2s;
+  white-space: nowrap;
+}
+.install-btn:hover { opacity: .88; }
+.install-btn.visible { display: flex; }
+
+/* iOS install popup */
+.ios-popup {
+  display: none;
+  position: fixed; bottom: 1.5rem; left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.2rem 1.4rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  z-index: 500; width: 90%; max-width: 360px;
+  font-size: .82rem; line-height: 1.6; color: var(--text);
+}
+.ios-popup.open { display: block; }
+.ios-popup strong { display: block; font-size: .88rem; margin-bottom: .4rem; }
+.ios-popup .close-popup {
+  position: absolute; top: .8rem; right: 1rem;
+  background: transparent; border: none;
+  font-size: 1rem; color: var(--muted); cursor: pointer;
+}
+.ios-popup .share-icon {
+  display: inline-block;
+  background: #007AFF; color: #fff;
+  border-radius: 5px; padding: .1rem .35rem;
+  font-size: .75rem; font-weight: 700; margin: 0 .2rem;
+}
+
 /* ── HERO ── */
 .hero {
   max-width: 1100px; margin: 0 auto; width: 100%;
@@ -259,7 +301,15 @@ footer {
     <li><a href="stundenplan/index.html">Stundenplan</a></li>
     <li><a href="#faecher">Fächer</a></li>
   </ul></nav>
+  <button class="install-btn" id="install-btn" onclick="handleInstall()">⬇ App installieren</button>
 </header>
+
+<!-- iOS Popup -->
+<div class="ios-popup" id="ios-popup">
+  <button class="close-popup" onclick="document.getElementById('ios-popup').classList.remove('open')">✕</button>
+  <strong>App installieren</strong>
+  Tippe unten auf <span class="share-icon">↑</span> „Teilen" und dann auf „Zum Home-Bildschirm" — fertig!
+</div>
 
 <div class="hero fade-up">
   <div class="hero-deco">G23f</div>
@@ -299,6 +349,45 @@ footer {
 
 <script>
 window.scrollTo(0, 0);
+
+// ── PWA INSTALL ───────────────────────────────────────
+let deferredPrompt = null;
+const installBtn = document.getElementById('install-btn');
+
+// Android / Chrome / Edge / Laptop
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.classList.add('visible');
+});
+
+// Hide button after install
+window.addEventListener('appinstalled', () => {
+  installBtn.classList.remove('visible');
+  deferredPrompt = null;
+});
+
+// iOS detection
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+if(isIOS && !isInStandaloneMode) {
+  installBtn.classList.add('visible');
+}
+
+function handleInstall() {
+  if(deferredPrompt) {
+    // Android/Chrome/Laptop
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => {
+      deferredPrompt = null;
+      installBtn.classList.remove('visible');
+    });
+  } else if(isIOS && !isInStandaloneMode) {
+    // iOS: show instructions
+    document.getElementById('ios-popup').classList.add('open');
+  }
+}
+window.handleInstall = handleInstall;
 const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.06 });
