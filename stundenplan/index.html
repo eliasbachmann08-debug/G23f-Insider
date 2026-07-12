@@ -13,7 +13,7 @@
   --green:#2d7a3a;--yellow:#a86800;--red:#b83232;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);}
 
 /* HEADER */
 header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:.85rem 2rem;display:flex;align-items:center;gap:1rem;}
@@ -60,6 +60,8 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
   margin-bottom:1.2rem;
   flex-wrap:wrap;
 }
+.toolbar-row1{display:contents;}
+.toolbar-row2{display:contents;}
 .page-title{font-size:1.35rem;font-weight:700;letter-spacing:-.02em;margin-right:.4rem;}
 .page-sub{display:none;}
 
@@ -286,35 +288,43 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
 
 /* ===== MOBILE ===== */
 @media(max-width:640px){
-  /* Header */
-  header{padding:.55rem .85rem;gap:.4rem;}
-  .back-btn{font-size:.72rem;padding:.2rem .4rem;}
-  .breadcrumb{font-size:.68rem;}
+  /* Header: alles in einer Zeile, kein overflow */
+  header{padding:.5rem .85rem;gap:.4rem;overflow:hidden;}
+  .back-btn{font-size:.7rem;padding:.18rem .38rem;flex-shrink:0;}
+  .breadcrumb{font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;}
   .chip-name{display:none;}
-  .logout-btn{font-size:.66rem;padding:.2rem .4rem;}
+  .user-chip{padding:.18rem .35rem .18rem .18rem;flex-shrink:0;}
+  .chip-avatar{width:22px;height:22px;}
+  .logout-btn{font-size:.64rem;padding:.18rem .38rem;flex-shrink:0;}
 
   /* App */
-  .app-wrap{padding:.8rem .8rem 3rem;}
+  .app-wrap{padding:.8rem .85rem 2rem;}
 
-  /* Toolbar: kompakte 3-Zeilen Struktur */
+  /* Toolbar: Zeile 1 = Titel + Add-Button, Zeile 2 = Controls */
   .toolbar{
-    display:grid;
-    grid-template-columns:auto 1fr auto auto;
-    grid-template-rows:auto auto;
-    gap:.35rem;
-    margin-bottom:.65rem;
-    align-items:center;
+    display:flex;
+    flex-direction:column;
+    gap:.45rem;
+    margin-bottom:.8rem;
   }
-  .page-title{font-size:1.1rem;font-weight:700;grid-column:1/-1;grid-row:1;}
-  .view-dropdown-wrap{grid-column:1;grid-row:2;}
-  .view-dropdown-btn{font-size:.72rem;padding:.38rem .65rem;min-width:85px;}
-  .filter-dropdown-wrap{grid-column:2;grid-row:2;}
-  .filter-dropdown-btn{font-size:.72rem;padding:.38rem .65rem;min-width:100px;}
-  .nav-row{grid-column:3;grid-row:2;gap:.25rem;}
+  .toolbar-row1{display:flex;align-items:center;justify-content:space-between;gap:.4rem;}
+  .toolbar-row2{display:flex;align-items:center;gap:.35rem;width:100%;}
+  .page-title{font-size:1.15rem;font-weight:700;}
+
+  /* View + Filter dropdowns nebeneinander */
+  .view-dropdown-wrap{flex-shrink:0;}
+  .view-dropdown-btn{font-size:.72rem;padding:.38rem .6rem;min-width:80px;}
+  .filter-dropdown-wrap{flex-shrink:0;}
+  .filter-dropdown-btn{font-size:.72rem;padding:.38rem .6rem;min-width:90px;}
+
+  /* Nav: Pfeile + Datum, nimmt restlichen Platz */
+  .nav-row{flex:1;display:flex;align-items:center;justify-content:flex-end;gap:.25rem;}
   .heute-btn{display:none;}
-  .period-lbl{font-size:.72rem;min-width:65px;}
-  .nav-btn{width:26px;height:26px;font-size:.85rem;}
-  .btn-add{grid-column:4;grid-row:2;padding:.38rem .6rem;font-size:.75rem;gap:.2rem;}
+  .period-lbl{font-size:.72rem;min-width:0;text-align:center;flex:1;}
+  .nav-btn{width:26px;height:26px;font-size:.85rem;flex-shrink:0;}
+
+  /* Add button: in Zeile 1 rechts */
+  .btn-add{font-size:.75rem;padding:.38rem .7rem;gap:.2rem;flex-shrink:0;}
 
   /* Week: horizontal scroll */
   .week-grid{
@@ -442,42 +452,44 @@ header{position:sticky;top:0;z-index:100;background:rgba(255,253,249,.96);backdr
   <div class="app-wrap">
     <!-- TOOLBAR schulNetz style -->
     <div class="toolbar" id="toolbar">
-      <h1 class="page-title">📅 Stundenplan</h1>
-
-      <!-- View Dropdown -->
-      <div class="view-dropdown-wrap">
-        <button class="view-dropdown-btn" onclick="toggleViewDropdown()">
-          <span id="view-label">Tag</span><span class="arr">▼</span>
-        </button>
-        <div class="view-dropdown-menu" id="view-dropdown-menu">
-          <span class="vdm-item active" id="vdm-tag" onclick="setView('tag');toggleViewDropdown()">Tag</span>
-          <span class="vdm-item" id="vdm-woche" onclick="setView('woche');toggleViewDropdown()">Woche</span>
-          <span class="vdm-item" id="vdm-monat" onclick="setView('monat');toggleViewDropdown()">Monat</span>
+      <!-- Zeile 1: Titel + Hinzufügen -->
+      <div class="toolbar-row1">
+        <h1 class="page-title">📅 Stundenplan</h1>
+        <button class="btn-add" onclick="openAdd()">＋ Hinzufügen</button>
+      </div>
+      <!-- Zeile 2: View, Filter, Nav -->
+      <div class="toolbar-row2">
+        <!-- View Dropdown -->
+        <div class="view-dropdown-wrap">
+          <button class="view-dropdown-btn" onclick="toggleViewDropdown()">
+            <span id="view-label">Woche</span><span class="arr">▼</span>
+          </button>
+          <div class="view-dropdown-menu" id="view-dropdown-menu">
+            <span class="vdm-item" id="vdm-tag" onclick="setView('tag');toggleViewDropdown()">Tag</span>
+            <span class="vdm-item active" id="vdm-woche" onclick="setView('woche');toggleViewDropdown()">Woche</span>
+            <span class="vdm-item" id="vdm-monat" onclick="setView('monat');toggleViewDropdown()">Monat</span>
+          </div>
+        </div>
+        <!-- Filter Dropdown -->
+        <div class="filter-dropdown-wrap">
+          <button class="filter-dropdown-btn" onclick="toggleFilterDropdown()">
+            <span id="filter-label">Alle</span><span class="arr">▼</span>
+          </button>
+          <div class="filter-dropdown-menu" id="filter-dropdown-menu">
+            <span class="fdm-item active" id="fdm-all" onclick="setFilter('all');toggleFilterDropdown()">Alle</span>
+            <span class="fdm-item" id="fdm-hausaufgabe" onclick="setFilter('hausaufgabe');toggleFilterDropdown()">✏️ Hausaufgaben</span>
+            <span class="fdm-item" id="fdm-test" onclick="setFilter('test');toggleFilterDropdown()">📝 Tests</span>
+            <span class="fdm-item" id="fdm-organisatorisch" onclick="setFilter('organisatorisch');toggleFilterDropdown()">📌 Organisatorisches</span>
+          </div>
+        </div>
+        <!-- Nav -->
+        <div class="nav-row">
+          <button class="nav-btn" onclick="navigate(-1)">‹</button>
+          <button class="heute-btn" onclick="goToday()">Heute</button>
+          <span class="period-lbl" id="period-lbl">–</span>
+          <button class="nav-btn" onclick="navigate(1)">›</button>
         </div>
       </div>
-
-      <!-- Nav -->
-      <div class="nav-row">
-        <button class="nav-btn" onclick="navigate(-1)">‹</button>
-        <button class="heute-btn" onclick="goToday()">Heute</button>
-        <span class="period-lbl" id="period-lbl">–</span>
-        <button class="nav-btn" onclick="navigate(1)">›</button>
-      </div>
-
-      <!-- Filter Dropdown -->
-      <div class="filter-dropdown-wrap">
-        <button class="filter-dropdown-btn" onclick="toggleFilterDropdown()">
-          <span id="filter-label">Alle</span><span class="arr">▼</span>
-        </button>
-        <div class="filter-dropdown-menu" id="filter-dropdown-menu">
-          <span class="fdm-item active" id="fdm-all" onclick="setFilter('all');toggleFilterDropdown()">Alle</span>
-          <span class="fdm-item" id="fdm-hausaufgabe" onclick="setFilter('hausaufgabe');toggleFilterDropdown()">✏️ Hausaufgaben</span>
-          <span class="fdm-item" id="fdm-test" onclick="setFilter('test');toggleFilterDropdown()">📝 Tests</span>
-          <span class="fdm-item" id="fdm-organisatorisch" onclick="setFilter('organisatorisch');toggleFilterDropdown()">📌 Organisatorisches</span>
-        </div>
-      </div>
-
-      <button class="btn-add" onclick="openAdd()">＋ Hinzufügen</button>
     </div>
     <div id="view-tag"></div>
     <div id="view-woche" style="display:none;"></div>
@@ -593,7 +605,7 @@ const ADMIN_EMAIL = 'eliasbachmann08@gmail.com';
 
 let entries = [], prevEntryIds = null;
 let currentUser = null, currentProfile = null;
-let currentView = 'tag', cursor = new Date();
+let currentView = 'woche', cursor = new Date();
 cursor.setHours(0,0,0,0);
 let selType_ = 'hausaufgabe', unsubscribe = null;
 let activeFilter = 'all';
@@ -697,6 +709,7 @@ onAuthStateChanged(auth, async user=>{
     document.getElementById('logout-btn').style.display='inline-block';
     show('scr-app');
     loadAllUsers();
+    window.setView('woche');
     startListening();
   } else {
     currentUser=null; currentProfile=null;
