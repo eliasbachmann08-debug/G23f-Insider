@@ -56,6 +56,7 @@ let entries = [];
 let currentView = "week";
 let currentFilter = "all";
 let selectedDate = startOfToday();
+let activeDay = null;
 let editingEntryId = null;
 let selectedType = "hausaufgabe";
 let selectedVisibility = "alle";
@@ -66,7 +67,6 @@ let authFlowBusy = false;
 let sessionRun = 0;
 let migrationStarted = false;
 let toastTimer = null;
-let touchStart = null;
 
 const entryUnsubscribers = [];
 let reportsUnsubscribe = null;
@@ -411,6 +411,7 @@ async function loadSession(user) {
     currentView = "week";
     currentFilter = "all";
     selectedDate = startOfToday();
+    activeDay = null;
     $("entry-filter").value = "all";
     showScreen("screen-app");
     renderCalendar();
@@ -470,13 +471,14 @@ function startEntryListeners() {
   stopEntryListeners();
   migrationStarted = false;
   const entriesRef = collection(db, COLLECTIONS.entries);
-  const sources = isAdmin()
-    ? [["admin", query(entriesRef)]]
-    : [
-        ["all", query(entriesRef, where("visibility", "==", "alle"))],
-        ["own", query(entriesRef, where("authorUid", "==", currentUser.uid))],
-        ["selected", query(entriesRef, where("visibleToUids", "array-contains", currentUser.uid))]
-      ];
+  // Everyone, including Elias, receives only the entries they are allowed to
+  // see. The three constrained queries are required because Firestore rules
+  // do not filter a broad collection query after it has been made.
+  const sources = [
+    ["all", query(entriesRef, where("visibility", "==", "alle"))],
+    ["own", query(entriesRef, where("authorUid", "==", currentUser.uid))],
+    ["selected", query(entriesRef, where("visibleToUids", "array-contains", currentUser.uid))]
+  ];
 
   for (const [sourceName, sourceQuery] of sources) {
     const unsubscribe = onSnapshot(sourceQuery, snapshot => {
@@ -517,6 +519,7 @@ function mergeEntrySources() {
     return (timestampDate(a.createdAt || a.ts)?.getTime() || 0) - (timestampDate(b.createdAt || b.ts)?.getTime() || 0);
   });
   renderCalendar();
+  if (isAdmin() && !$("reports-modal").hidden) renderReports();
 }
 
 async function migrateLegacyEntries() {
@@ -602,9 +605,12 @@ function eventBars(list, maximum = 4) {
 }
 
 function compactEntryHTML(entry, className = "calendar-entry") {
+  const label = className === "agenda-entry"
+    ? `<span class="entry-main"><span class="entry-label">${escapeHTML(entryTitle(entry))}</span><span class="entry-tap-hint">Antippen für genauere Infos</span></span>`
+    : `<span class="entry-label">${escapeHTML(entryTitle(entry))}</span>`;
   return `<button class="${className} ${escapeHTML(entry.type)}" type="button" data-entry-id="${safeId(entry.id)}">
     <span class="entry-kind">${escapeHTML(typeKind(entry))}</span>
-    <span class="entry-label">${escapeHTML(entryTitle(entry))}</span>
+    ${label}
     ${className === "agenda-entry" ? '<span class="entry-chevron">›</span>' : ""}
   </button>`;
 }
@@ -615,19 +621,20 @@ function renderWeek() {
 
   const desktop = days.map((day, index) => {
     const dayEntries = entriesForDate(day);
-    const classes = ["week-day", sameDate(day, selectedDate) ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
-    return `<section class="${classes}">
-      <button class="day-header" type="button" data-calendar-date="${dateString(day)}">
+    const isSelected = activeDay && sameDate(day, activeDay);
+    const classes = ["week-day", isSelected ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
+    return `<section class="${classes}" data-calendar-date="${dateString(day)}" role="button" tabindex="0" aria-pressed="${isSelected ? "true" : "false"}" aria-label="${escapeHTML(longDate(day))} auswählen">
+      <div class="day-header">
         <strong>${["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index]}</strong>
         <span>${shortDate(day)}</span>
-      </button>
+      </div>
       <div class="week-entries">${dayEntries.length ? dayEntries.map(entry => compactEntryHTML(entry)).join("") : '<div class="week-empty">Keine Einträge</div>'}</div>
     </section>`;
   }).join("");
 
   const mobile = days.map((day, index) => {
     const dayEntries = entriesForDate(day);
-    const classes = ["strip-day", sameDate(day, selectedDate) ? "selected" : "", isToday(day) ? "today" : "", index === 6 ? "sunday" : ""].filter(Boolean).join(" ");
+    const classes = ["strip-day", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : "", index === 6 ? "sunday" : ""].filter(Boolean).join(" ");
     return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
       <span class="strip-weekday">${["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index]}</span>
       <span class="strip-number">${day.getDate()}</span>
@@ -649,7 +656,7 @@ function renderMonth() {
   const cells = days.map(day => {
     const dayEntries = entriesForDate(day);
     const outside = day.getMonth() !== selectedDate.getMonth();
-    const classes = ["month-day", outside ? "outside" : "", sameDate(day, selectedDate) ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
+    const classes = ["month-day", outside ? "outside" : "", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
     const labels = dayEntries.slice(0, 3).map(entry => `<span class="month-event ${escapeHTML(entry.type)}">${escapeHTML(entryTitle(entry))}</span>`).join("");
     const more = dayEntries.length > 3 ? `<span class="month-more">+${dayEntries.length - 3}</span>` : "";
     return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
@@ -663,8 +670,15 @@ function renderMonth() {
 }
 
 function renderAgenda() {
-  const dayEntries = entriesForDate(selectedDate);
-  $("agenda-date").textContent = longDate(selectedDate);
+  const agenda = $("agenda-section");
+  if (!activeDay) {
+    agenda.hidden = true;
+    $("agenda-list").innerHTML = "";
+    return;
+  }
+  agenda.hidden = false;
+  const dayEntries = entriesForDate(activeDay);
+  $("agenda-date").textContent = longDate(activeDay);
   $("agenda-count").textContent = `${dayEntries.length} ${dayEntries.length === 1 ? "Eintrag" : "Einträge"}`;
   $("agenda-list").innerHTML = dayEntries.length
     ? dayEntries.map(entry => compactEntryHTML(entry, "agenda-entry")).join("")
@@ -676,9 +690,6 @@ function renderCalendar(animate = false) {
   $("calendar-card").dataset.view = currentView;
   $("week-view-btn").classList.toggle("active", currentView === "week");
   $("month-view-btn").classList.toggle("active", currentView === "month");
-  $("swipe-hint").textContent = currentView === "month"
-    ? "Nach oben wischen für die Woche"
-    : "Nach unten wischen für den Monat";
 
   if (currentView === "week") {
     const monday = startOfWeek(selectedDate);
@@ -706,7 +717,96 @@ function setCalendarView(view, animate = true) {
 function navigatePeriod(direction) {
   if (currentView === "week") selectedDate = addDays(selectedDate, direction * 7);
   else selectedDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + direction, Math.min(selectedDate.getDate(), 28));
+  activeDay = null;
   renderCalendar(true);
+}
+
+function selectCalendarDay(date, scrollToPanel = true) {
+  const wasSelected = activeDay && sameDate(activeDay, date);
+  selectedDate = cloneDate(date);
+  activeDay = wasSelected ? null : cloneDate(date);
+  renderCalendar();
+  if (activeDay && scrollToPanel) {
+    requestAnimationFrame(() => $("agenda-section").scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+}
+
+function normalizedSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("de-CH")
+    .trim();
+}
+
+function entrySearchText(entry) {
+  const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
+  return normalizedSearchText([
+    meta.short, meta.long, entry.fach, entry.thema, entry.infos,
+    entry.authorName, entry.visibleToNames?.join(" ")
+  ].filter(Boolean).join(" "));
+}
+
+function searchResultHTML(entry, isPast) {
+  const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
+  const secondary = entry.type === "organisatorisch" ? entry.infos : entry.thema;
+  const dateLabel = entry.dateTo && entry.dateTo !== entry.date
+    ? `${shortDate(parseDate(entry.date))} – ${shortDate(parseDate(entry.dateTo))}`
+    : longDate(parseDate(entry.date));
+  return `<button class="search-result ${isPast ? "past" : ""}" type="button" data-search-entry-id="${safeId(entry.id)}">
+    <span class="search-result-kind ${escapeHTML(entry.type)}">${escapeHTML(meta.icon)} ${escapeHTML(meta.short)}</span>
+    <span class="search-result-main">
+      <strong>${escapeHTML(entryTitle(entry))}</strong>
+      ${secondary ? `<span>${escapeHTML(secondary)}</span>` : ""}
+      <time>${escapeHTML(dateLabel)}</time>
+    </span>
+    <span class="search-result-arrow" aria-hidden="true">›</span>
+  </button>`;
+}
+
+function renderSearchResults() {
+  const queryText = normalizedSearchText($("calendar-search").value);
+  const container = $("search-results");
+  if (!queryText) {
+    container.innerHTML = '<div class="search-empty">Beginne zu tippen. Die Suche prüft Fach, Ereignis, Auftrag und zusätzliche Infos.</div>';
+    return;
+  }
+
+  const matches = entries.filter(entry => entrySearchText(entry).includes(queryText));
+  const today = dateString(startOfToday());
+  const upcoming = matches
+    .filter(entry => (entry.dateTo || entry.date) >= today)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const past = matches
+    .filter(entry => (entry.dateTo || entry.date) < today)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  if (!matches.length) {
+    container.innerHTML = `<div class="search-empty">Keine Einträge zu „${escapeHTML($("calendar-search").value.trim())}“ gefunden.</div>`;
+    return;
+  }
+
+  container.innerHTML = `${upcoming.length ? `<section class="search-group"><h3>Kommend</h3>${upcoming.map(entry => searchResultHTML(entry, false)).join("")}</section>` : ""}
+    ${past.length ? `<section class="search-group past-group"><h3>Vorbei</h3>${past.map(entry => searchResultHTML(entry, true)).join("")}</section>` : ""}`;
+}
+
+function openCalendarSearch() {
+  $("calendar-search").value = "";
+  renderSearchResults();
+  openModal("search-modal");
+}
+
+function jumpToSearchEntry(entryId) {
+  const entry = entries.find(item => item.id === entryId);
+  if (!entry) return;
+  const date = parseDate(entry.date);
+  currentFilter = "all";
+  $("entry-filter").value = "all";
+  selectedDate = cloneDate(date);
+  activeDay = cloneDate(date);
+  closeModal("search-modal");
+  renderCalendar(true);
+  requestAnimationFrame(() => $("agenda-section").scrollIntoView({ behavior: "smooth", block: "start" }));
 }
 
 function openModal(id) {
@@ -797,13 +897,14 @@ function addSelectedPerson(uid) {
 }
 
 async function openAddEntry() {
+  const entryDate = activeDay || selectedDate;
   editingEntryId = null;
   selectedPeople = [];
   $("entry-modal-title").textContent = "Neuer Eintrag";
   $("entry-save-btn").textContent = "Speichern";
-  $("entry-date").value = dateString(selectedDate);
-  $("entry-date-from").value = dateString(selectedDate);
-  $("entry-date-to").value = dateString(selectedDate);
+  $("entry-date").value = dateString(entryDate);
+  $("entry-date-from").value = dateString(entryDate);
+  $("entry-date-to").value = dateString(entryDate);
   $("entry-topic").value = "";
   $("entry-info").value = "";
   $("people-search").value = "";
@@ -1143,20 +1244,25 @@ function reportReasonLabel(reason) {
 }
 
 function renderReports() {
-  $("reports-list").innerHTML = openReports.length ? openReports.map(report => `
-    <article class="report-card">
-      <div class="report-card-head">
-        <h3>${report.targetType === "entry" ? "📅 Eintrag" : "👤 Konto"}: ${escapeHTML(report.targetLabel)}</h3>
-        <span class="detail-meta">${escapeHTML(formatTimestamp(report.createdAt))}</span>
-      </div>
-      <p><strong>${escapeHTML(reportReasonLabel(report.reason))}</strong> · gemeldet von ${escapeHTML(report.reporterName || "Unbekannt")}</p>
-      ${report.details ? `<p>${escapeHTML(report.details)}</p>` : ""}
-      <div class="detail-actions">
-        <button class="action-btn" type="button" data-open-report-target="${safeId(report.id)}">Öffnen</button>
-        ${report.targetType === "user" ? `<button class="action-btn danger" type="button" data-block-report-user="${safeId(report.id)}">Konto sperren</button>` : ""}
-        <button class="action-btn" type="button" data-resolve-report="${safeId(report.id)}">Als erledigt markieren</button>
-      </div>
-    </article>`).join("") : '<div class="empty-state">Keine offenen Meldungen. ✓</div>';
+  $("reports-list").innerHTML = openReports.length ? openReports.map(report => {
+    const targetIsVisible = report.targetType === "user" || entries.some(entry => entry.id === report.targetId);
+    return `
+      <article class="report-card">
+        <div class="report-card-head">
+          <h3>${report.targetType === "entry" ? "📅 Eintrag" : "👤 Konto"}: ${escapeHTML(report.targetLabel)}</h3>
+          <span class="detail-meta">${escapeHTML(formatTimestamp(report.createdAt))}</span>
+        </div>
+        <p><strong>${escapeHTML(reportReasonLabel(report.reason))}</strong> · gemeldet von ${escapeHTML(report.reporterName || "Unbekannt")}</p>
+        ${report.details ? `<p>${escapeHTML(report.details)}</p>` : ""}
+        ${report.targetType === "entry" && !targetIsVisible ? '<p class="detail-meta">🔒 Der Inhalt ist für dich nicht freigegeben und bleibt verborgen.</p>' : ""}
+        <div class="detail-actions">
+          ${targetIsVisible ? `<button class="action-btn" type="button" data-open-report-target="${safeId(report.id)}">Öffnen</button>` : ""}
+          ${report.targetType === "entry" ? `<button class="action-btn danger" type="button" data-delete-report-entry="${safeId(report.id)}">Eintrag löschen</button>` : ""}
+          ${report.targetType === "user" ? `<button class="action-btn danger" type="button" data-block-report-user="${safeId(report.id)}">Konto sperren</button>` : ""}
+          <button class="action-btn" type="button" data-resolve-report="${safeId(report.id)}">Als erledigt markieren</button>
+        </div>
+      </article>`;
+  }).join("") : '<div class="empty-state">Keine offenen Meldungen. ✓</div>';
 }
 
 async function resolveReport(reportId) {
@@ -1169,6 +1275,29 @@ async function resolveReport(reportId) {
     toast("✓ Meldung erledigt");
   } catch {
     toast("⚠️ Meldung konnte nicht aktualisiert werden");
+  }
+}
+
+async function deleteReportedEntry(report) {
+  if (!isAdmin() || report.targetType !== "entry") return;
+  if (!confirm("Diesen gemeldeten Eintrag wirklich löschen? Ein geschützter Inhalt wird dir dabei nicht angezeigt.")) return;
+
+  try {
+    await deleteDoc(doc(db, COLLECTIONS.entries, report.targetId));
+  } catch {
+    toast("⚠️ Der gemeldete Eintrag konnte nicht gelöscht werden");
+    return;
+  }
+
+  try {
+    await updateDoc(doc(db, COLLECTIONS.reports, report.id), {
+      status: "resolved",
+      resolvedAt: serverTimestamp(),
+      resolvedByUid: currentUser.uid
+    });
+    toast("✓ Eintrag gelöscht und Meldung erledigt");
+  } catch {
+    toast("✓ Eintrag gelöscht. Markiere die Meldung noch als erledigt.");
   }
 }
 
@@ -1308,10 +1437,15 @@ $("reports-btn").addEventListener("click", openReportsCenter);
 // Calendar events
 $("previous-period-btn").addEventListener("click", () => navigatePeriod(-1));
 $("next-period-btn").addEventListener("click", () => navigatePeriod(1));
-$("today-btn").addEventListener("click", () => { selectedDate = startOfToday(); renderCalendar(true); });
+$("today-btn").addEventListener("click", () => {
+  selectedDate = startOfToday();
+  activeDay = null;
+  renderCalendar(true);
+});
 $("week-view-btn").addEventListener("click", () => setCalendarView("week"));
 $("month-view-btn").addEventListener("click", () => setCalendarView("month"));
 $("entry-filter").addEventListener("change", event => { currentFilter = event.target.value; renderCalendar(); });
+$("open-search-btn").addEventListener("click", openCalendarSearch);
 $("desktop-add-btn").addEventListener("click", openAddEntry);
 $("mobile-add-btn").addEventListener("click", openAddEntry);
 
@@ -1320,33 +1454,26 @@ function handleCalendarClick(event) {
   if (entryButton) return openEntryDetail(decodeId(entryButton.dataset.entryId));
   const dateButton = event.target.closest("[data-calendar-date]");
   if (dateButton) {
-    selectedDate = parseDate(dateButton.dataset.calendarDate);
-    renderCalendar();
+    selectCalendarDay(parseDate(dateButton.dataset.calendarDate));
   }
 }
 
 $("calendar-surface").addEventListener("click", handleCalendarClick);
 $("agenda-list").addEventListener("click", handleCalendarClick);
 
-$("calendar-surface").addEventListener("touchstart", event => {
-  const touch = event.changedTouches[0];
-  touchStart = { x: touch.clientX, y: touch.clientY };
-}, { passive: true });
+$("calendar-surface").addEventListener("keydown", event => {
+  if (!['Enter', ' '].includes(event.key) || event.target.closest("[data-entry-id]")) return;
+  const dateTarget = event.target.closest("[data-calendar-date]");
+  if (!dateTarget) return;
+  event.preventDefault();
+  selectCalendarDay(parseDate(dateTarget.dataset.calendarDate));
+});
 
-$("calendar-surface").addEventListener("touchend", event => {
-  if (!touchStart) return;
-  const touch = event.changedTouches[0];
-  const dx = touch.clientX - touchStart.x;
-  const dy = touch.clientY - touchStart.y;
-  touchStart = null;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 48) return;
-  if (Math.abs(dy) > Math.abs(dx)) {
-    if (dy < 0 && currentView === "month") setCalendarView("week");
-    else if (dy > 0 && currentView === "week") setCalendarView("month");
-  } else {
-    navigatePeriod(dx < 0 ? 1 : -1);
-  }
-}, { passive: true });
+$("calendar-search").addEventListener("input", renderSearchResults);
+$("search-results").addEventListener("click", event => {
+  const button = event.target.closest("[data-search-entry-id]");
+  if (button) jumpToSearchEntry(decodeId(button.dataset.searchEntryId));
+});
 
 // Entry form and person selection
 $("entry-type-switch").addEventListener("click", event => {
@@ -1407,7 +1534,8 @@ $("reports-list").addEventListener("click", event => {
   const openButton = event.target.closest("[data-open-report-target]");
   const resolveButton = event.target.closest("[data-resolve-report]");
   const blockButton = event.target.closest("[data-block-report-user]");
-  const encodedReportId = openButton?.dataset.openReportTarget || resolveButton?.dataset.resolveReport || blockButton?.dataset.blockReportUser;
+  const deleteEntryButton = event.target.closest("[data-delete-report-entry]");
+  const encodedReportId = openButton?.dataset.openReportTarget || resolveButton?.dataset.resolveReport || blockButton?.dataset.blockReportUser || deleteEntryButton?.dataset.deleteReportEntry;
   if (!encodedReportId) return;
   const report = openReports.find(item => item.id === decodeId(encodedReportId));
   if (!report) return;
@@ -1419,6 +1547,8 @@ $("reports-list").addEventListener("click", event => {
     resolveReport(report.id);
   } else if (blockButton) {
     blockUser(report.targetId, report.targetLabel);
+  } else if (deleteEntryButton) {
+    deleteReportedEntry(report);
   }
 });
 

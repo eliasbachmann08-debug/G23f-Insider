@@ -1,4 +1,4 @@
-const CACHE_NAME = "g23f-insider-v1";
+const CACHE_NAME = "g23f-insider-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,9 @@ const APP_SHELL = [
   "./stundenplan/index.html",
   "./stundenplan/styles.css",
   "./stundenplan/app.js",
+  "./notes/index.html",
+  "./notes/styles.css",
+  "./notes/app.js",
   "./faecher/faecher.json",
   "./faecher/biologie/index.html",
   "./faecher/biologie/themen.json"

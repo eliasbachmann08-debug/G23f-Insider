@@ -54,7 +54,7 @@
         <p class="auth-lead">Nur Personen mit dem Klassenpasswort können ein Konto freischalten.</p>
         <form class="auth-card" id="register-form" novalidate>
           <label for="register-name">Echter Vorname <span class="required">*</span></label>
-          <input id="register-name" type="text" maxlength="24" autocomplete="given-name" placeholder="z. B. Erin" required>
+          <input id="register-name" type="text" maxlength="24" autocomplete="given-name" placeholder="z. B. Calvin" required>
           <p class="field-help important-help">Dein Vorname ist deine eindeutige Klassen-ID. Schreibe ihn richtig. Gross- und Kleinschreibung spielen später bei der Suche keine Rolle.</p>
 
           <label for="register-email">E-Mail <span class="required">*</span></label>
@@ -112,7 +112,8 @@
               <button class="nav-btn" id="next-period-btn" type="button" aria-label="Nächster Zeitraum">›</button>
             </div>
             <div class="calendar-controls">
-              <div class="view-switch" aria-label="Kalenderansicht">
+              <button class="calendar-search-btn" id="open-search-btn" type="button" aria-label="Einträge suchen">⌕ <span>Suchen</span></button>
+              <div class="view-switch" role="group" aria-label="Kalenderansicht">
                 <button class="view-btn active" id="week-view-btn" type="button" data-view="week">Woche</button>
                 <button class="view-btn" id="month-view-btn" type="button" data-view="month">Monat</button>
               </div>
@@ -128,19 +129,19 @@
             </div>
           </div>
 
-          <div class="swipe-hint" id="swipe-hint">Nach unten wischen für den Monat</div>
-          <div class="calendar-surface" id="calendar-surface" aria-live="polite"></div>
-        </section>
-
-        <section class="agenda" id="agenda-section">
-          <div class="agenda-heading">
-            <div>
-              <p class="eyebrow">Ausgewählter Tag</p>
-              <h2 id="agenda-date">–</h2>
+          <section class="agenda" id="agenda-section" hidden>
+            <div class="agenda-heading">
+              <div>
+                <p class="eyebrow">Ausgewählter Tag</p>
+                <h2 id="agenda-date">–</h2>
+                <p class="agenda-help">Tippe auf einen Eintrag für genauere Infos.</p>
+              </div>
+              <span class="agenda-count" id="agenda-count">0 Einträge</span>
             </div>
-            <span class="agenda-count" id="agenda-count">0 Einträge</span>
-          </div>
-          <div class="agenda-list" id="agenda-list"></div>
+            <div class="agenda-list" id="agenda-list"></div>
+          </section>
+
+          <div class="calendar-surface" id="calendar-surface" aria-live="polite"></div>
         </section>
       </div>
 
@@ -220,6 +221,20 @@
           <button class="primary-btn inline-primary" id="entry-save-btn" type="submit">Speichern</button>
         </div>
       </form>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="search-modal" hidden>
+    <section class="modal search-modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
+      <button class="modal-close" type="button" data-close-modal="search-modal" aria-label="Schliessen">✕</button>
+      <p class="eyebrow">Stundenplan</p>
+      <h2 id="search-modal-title">Einträge suchen</h2>
+      <p class="search-lead">Suche zum Beispiel nach einem Fach, Ereignis oder Stichwort.</p>
+      <label class="search-input-wrap">
+        <span aria-hidden="true">⌕</span>
+        <input id="calendar-search" type="search" autocomplete="off" placeholder="z. B. Deutsch">
+      </label>
+      <div class="search-results" id="search-results" aria-live="polite"></div>
     </section>
   </div>
 

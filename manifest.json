@@ -8,6 +8,18 @@
   "display": "standalone",
   "background_color": "#F5F1EA",
   "theme_color": "#8B7355",
+  "shortcuts": [
+    {
+      "name": "Stundenplan",
+      "short_name": "Stundenplan",
+      "url": "./stundenplan/"
+    },
+    {
+      "name": "G23f-Notes",
+      "short_name": "Notes",
+      "url": "./notes/"
+    }
+  ],
   "icons": [
     {
       "src": "icon-192.png",
