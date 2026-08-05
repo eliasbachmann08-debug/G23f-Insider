@@ -2,9 +2,10 @@
   "name": "G23f-Insider",
   "short_name": "G23f",
   "description": "Lernplattform der Klasse G23f",
-  "start_url": "/",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
   "background_color": "#F5F1EA",
   "theme_color": "#8B7355",
   "icons": [

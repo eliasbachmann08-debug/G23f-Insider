@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de-CH">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>G23f-Insider</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap">
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#8B7355">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="G23f-Insider">
@@ -28,6 +28,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   display: flex; flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* ── HEADER ── */
@@ -190,6 +191,11 @@ header {
   text-transform: uppercase; color: var(--muted); white-space: nowrap;
 }
 .section-line { flex: 1; height: 1px; background: var(--border); }
+.subject-summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  margin: -.35rem 0 1rem; color: var(--muted); font-size: .74rem; line-height: 1.5;
+}
+.subject-summary strong { color: var(--text); }
 
 /* ── SUBJECT GRID ── */
 .subject-grid {
@@ -286,6 +292,7 @@ footer {
   .section { padding: 1.5rem 1.25rem 1rem; }
   .divider { padding: 0 1.25rem; }
   .disclaimer { padding: .5rem 1.25rem 1.5rem; }
+  .subject-summary { align-items: flex-start; flex-direction: column; gap: .2rem; }
   .subject-grid { grid-template-columns: 1fr 1fr; }
 }
 @media(max-width: 400px) {
@@ -333,9 +340,10 @@ footer {
 
 <section class="section fade-up" style="transition-delay:.18s" id="faecher">
   <div class="section-head">
-    <span class="section-title">Fächer</span>
+    <span class="section-title">Fächer &amp; Lernapps</span>
     <div class="section-line"></div>
   </div>
+  <div class="subject-summary" id="subject-summary" aria-live="polite">Verfügbarkeit wird geprüft …</div>
   <div class="subject-grid" id="faecher-grid">
     <div style="color:var(--muted);font-size:.82rem;">Lädt…</div>
   </div>
@@ -388,6 +396,14 @@ function handleInstall() {
   }
 }
 window.handleInstall = handleInstall;
+
+// Keep the installable app up to date and provide a basic offline fallback.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+
 const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.06 });
@@ -397,6 +413,10 @@ fetch('faecher/faecher.json')
   .then(r => r.json())
   .then(faecher => {
     faecher.sort((a,b) => b.verfuegbar - a.verfuegbar);
+    const readyCount = faecher.filter(f => f.verfuegbar).length;
+    document.getElementById('subject-summary').innerHTML = readyCount
+      ? `<span><strong>${readyCount}</strong> von ${faecher.length} Lernbereichen verfügbar</span><span>Weitere folgen nach dem Unterricht.</span>`
+      : `<span><strong>Noch keine Zusammenfassung veröffentlicht.</strong></span><span>Die Fächer werden nach dem Unterricht freigeschaltet.</span>`;
     document.getElementById('faecher-grid').innerHTML = faecher.map(f => {
       if(f.verfuegbar){
         const pills = (f.themen||[]).map(t=>`<span class="card-pill">${t}</span>`).join('');
@@ -407,12 +427,15 @@ fetch('faecher/faecher.json')
         </a>`;
       }
       return `<div class="subject-card inactive" style="--card-color:${f.color}">
-        <div class="card-top"><div class="card-icon">${f.icon}</div><div class="card-tag soon">Bald</div></div>
+        <div class="card-top"><div class="card-icon">${f.icon}</div><div class="card-tag soon">Noch offen</div></div>
         <div class="card-body"><h3>${f.name}</h3><p>Wird hinzugefügt, sobald das Thema behandelt wird.</p></div>
       </div>`;
     }).join('');
   })
-  .catch(()=>{ document.getElementById('faecher-grid').innerHTML='<div style="color:var(--muted);font-size:.82rem;">Fächer konnten nicht geladen werden.</div>'; });
+  .catch(()=>{
+    document.getElementById('subject-summary').textContent='Die Verfügbarkeit konnte nicht geladen werden.';
+    document.getElementById('faecher-grid').innerHTML='<div style="color:var(--muted);font-size:.82rem;">Fächer konnten nicht geladen werden.</div>';
+  });
 </script>
 </body>
 </html>
