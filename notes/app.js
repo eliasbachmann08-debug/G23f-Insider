@@ -1,23 +1,13 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, addDoc, updateDoc, deleteDoc,
   onSnapshot, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-  browserLocalPersistence, setPersistence
+  signInWithEmailAndPassword, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCe36w6HmFGScPaSjbFRkxrvuD9VCNrqDk",
-  authDomain: "g23f-studenplan.firebaseapp.com",
-  projectId: "g23f-studenplan",
-  storageBucket: "g23f-studenplan.firebasestorage.app",
-  messagingSenderId: "585686898310",
-  appId: "1:585686898310:web:3712285a4380ae380b6307"
-};
-
-const ADMIN_EMAIL = "eliasbachmann08@gmail.com";
+import { auth, db, isAdminUser } from "../shared/firebase.js";
+import { requireClassSession } from "../shared/session.js";
+import { mountGlobalShell } from "../shared/shell.js";
 const COLORS = {
   sand: "#fffdf9",
   yellow: "#fff2be",
@@ -26,11 +16,6 @@ const COLORS = {
   green: "#e1efdf",
   violet: "#e9e2f4"
 };
-
-const app = initializeApp(FIREBASE_CONFIG);
-const db = getFirestore(app);
-const auth = getAuth(app);
-await setPersistence(auth, browserLocalPersistence);
 
 const $ = id => document.getElementById(id);
 let currentUser = null;
@@ -47,9 +32,16 @@ let notesUnsubscribe = null;
 let foldersUnsubscribe = null;
 let toastTimer = null;
 let authBusy = false;
+let shellMounted = false;
+let autosaveTimer = null;
+let saveInFlight = false;
+let saveQueued = null;
+let deepLinkHandled = false;
+let notesReady = false;
+let foldersReady = false;
 
 function isAdmin() {
-  return currentUser?.email?.toLowerCase() === ADMIN_EMAIL;
+  return isAdminUser(currentUser);
 }
 
 function escapeHTML(value) {
@@ -102,6 +94,7 @@ function initials(name) {
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(screen => screen.classList.toggle("active", screen.id === id));
   $("header-account").hidden = id !== "screen-notes";
+  if ($("site-footer")) $("site-footer").hidden = id !== "screen-notes";
 }
 
 function showLoading(message = "Lädt …") {
@@ -139,11 +132,12 @@ function stopListeners() {
   foldersUnsubscribe = null;
   notes = [];
   folders = [];
+  notesReady = false;
+  foldersReady = false;
 }
 
 function updateHeader() {
-  $("header-name").textContent = currentProfile?.nickname || "Profil";
-  $("header-avatar").textContent = initials(currentProfile?.nickname);
+  // The shared profile component keeps the account button identical everywhere.
 }
 
 async function loadSession(user) {
@@ -153,10 +147,12 @@ async function loadSession(user) {
     if (!isAdmin()) {
       const member = await getDoc(doc(db, "members", user.uid));
       if (!member.exists() || member.data().blocked) {
-        $("blocked-message").textContent = member.exists() && member.data().blocked
-          ? "Dieses Klassenkonto ist gesperrt. Melde dich bei Elias."
-          : "Öffne zuerst den Stundenplan und schalte dein Konto einmalig mit dem Klassenpasswort frei.";
-        showScreen("screen-blocked");
+        if (member.exists() && member.data().blocked) {
+          await signOut(auth);
+          location.replace("../?error=blocked");
+        } else {
+          location.replace(`../?mode=join&returnTo=${encodeURIComponent(location.pathname + location.search)}`);
+        }
         return;
       }
     }
@@ -168,6 +164,16 @@ async function loadSession(user) {
     updateHeader();
     showScreen("screen-notes");
     startListeners();
+    if (!shellMounted) {
+      mountGlobalShell({
+        user: currentUser,
+        profile: currentProfile,
+        rootPath: "../",
+        pageLabel: "G23f-Notes",
+        onProfileUpdated: profile => { currentProfile = profile; }
+      });
+      shellMounted = true;
+    }
   } catch (error) {
     console.error(error);
     setError("login-error", "Die Notes konnten nicht geladen werden. Prüfe die Firebase-Regeln oder melde dich bei Elias.");
@@ -181,8 +187,10 @@ function startListeners() {
   stopListeners();
   notesUnsubscribe = onSnapshot(collection(db, "notes", currentUser.uid, "items"), snapshot => {
     notes = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    notesReady = true;
     renderNotes();
     renderFolderNavigation();
+    handleDeepLink();
   }, error => {
     console.error(error);
     toast("⚠️ Notizen konnten nicht geladen werden. Veröffentliche die neuen Firebase-Regeln.");
@@ -192,6 +200,7 @@ function startListeners() {
     folders = snapshot.docs
       .map(item => ({ id: item.id, ...item.data() }))
       .sort((a, b) => String(a.name).localeCompare(String(b.name), "de-CH", { sensitivity: "base" }));
+    foldersReady = true;
     if (activeFilter.type === "folder" && !folders.some(folder => folder.id === activeFilter.id)) {
       activeFilter = { type: "all", id: null };
     }
@@ -199,6 +208,7 @@ function startListeners() {
     renderFolderOptions();
     renderManageFolders();
     renderNotes();
+    handleDeepLink();
   }, error => console.error(error));
 }
 
@@ -207,11 +217,12 @@ function folderName(folderId) {
 }
 
 function folderCount(folderId) {
-  return notes.filter(note => note.folderId === folderId).length;
+  return notes.filter(note => note.folderId === folderId && !note.trashed).length;
 }
 
 function filterLabel() {
   if (activeFilter.type === "pinned") return "Angeheftet";
+  if (activeFilter.type === "trash") return "Papierkorb";
   if (activeFilter.type === "folder") return folderName(activeFilter.id) || "Ordner";
   return "Alle Notizen";
 }
@@ -226,8 +237,9 @@ function setFilter(type, id = null) {
 }
 
 function renderFolderNavigation() {
-  $("all-count").textContent = String(notes.length);
-  $("pinned-count").textContent = String(notes.filter(note => note.pinned).length);
+  $("all-count").textContent = String(notes.filter(note => !note.trashed).length);
+  $("pinned-count").textContent = String(notes.filter(note => note.pinned && !note.trashed).length);
+  if ($("trash-count")) $("trash-count").textContent = String(notes.filter(note => note.trashed).length);
   document.querySelectorAll("[data-note-filter]").forEach(button => {
     button.classList.toggle("active", button.dataset.noteFilter === activeFilter.type);
   });
@@ -240,6 +252,7 @@ function renderFolderNavigation() {
   const chips = [
     `<button class="mobile-filter-chip ${activeFilter.type === "all" ? "active" : ""}" type="button" data-mobile-filter="all">Alle</button>`,
     `<button class="mobile-filter-chip ${activeFilter.type === "pinned" ? "active" : ""}" type="button" data-mobile-filter="pinned">☆ Angeheftet</button>`,
+    `<button class="mobile-filter-chip ${activeFilter.type === "trash" ? "active" : ""}" type="button" data-mobile-filter="trash">🗑 Papierkorb</button>`,
     ...folders.map(folder => `<button class="mobile-filter-chip ${activeFilter.type === "folder" && activeFilter.id === folder.id ? "active" : ""}" type="button" data-mobile-folder="${encodeId(folder.id)}">${escapeHTML(folder.name)}</button>`)
   ];
   $("mobile-folder-strip").innerHTML = chips.join("");
@@ -248,6 +261,9 @@ function renderFolderNavigation() {
 function visibleNotes() {
   const queryText = normalizeSearch($("notes-search").value);
   return notes.filter(note => {
+    if (activeFilter.type === "trash") {
+      if (!note.trashed) return false;
+    } else if (note.trashed) return false;
     if (activeFilter.type === "pinned" && !note.pinned) return false;
     if (activeFilter.type === "folder" && note.folderId !== activeFilter.id) return false;
     if (!queryText) return true;
@@ -262,13 +278,14 @@ function noteCardHTML(note) {
   const color = COLORS[note.color] || COLORS.sand;
   const folder = folderName(note.folderId);
   const preview = String(note.contentText || "").trim() || "Leere Notiz";
-  return `<article class="note-card" style="--note-color:${color}">
+  const trashed = Boolean(note.trashed);
+  return `<article class="note-card ${trashed ? "trashed" : ""}" style="--note-color:${color}">
     <div class="note-card-head">
-      <button class="note-open-btn" type="button" data-open-note="${encodeId(note.id)}"><h3>${escapeHTML(note.title || "Ohne Titel")}</h3></button>
-      <button class="quick-pin ${note.pinned ? "active" : ""}" type="button" data-quick-pin="${encodeId(note.id)}" aria-label="${note.pinned ? "Nicht mehr anheften" : "Anheften"}">${note.pinned ? "★" : "☆"}</button>
+      <button class="note-open-btn" type="button" ${trashed ? "disabled" : `data-open-note="${encodeId(note.id)}"`}><h3>${escapeHTML(note.title || "Ohne Titel")}</h3></button>
+      ${trashed ? "" : `<button class="quick-pin ${note.pinned ? "active" : ""}" type="button" data-quick-pin="${encodeId(note.id)}" aria-label="${note.pinned ? "Nicht mehr anheften" : "Anheften"}">${note.pinned ? "★" : "☆"}</button>`}
     </div>
-    <button class="note-open-btn" type="button" data-open-note="${encodeId(note.id)}"><p class="note-preview">${escapeHTML(preview)}</p></button>
-    <div class="note-card-foot"><span class="folder-badge">${folder ? `📁 ${escapeHTML(folder)}` : "Ohne Ordner"}</span><time>${escapeHTML(formatUpdated(note.updatedAt || note.createdAt))}</time></div>
+    <button class="note-open-btn" type="button" ${trashed ? "disabled" : `data-open-note="${encodeId(note.id)}"`}><p class="note-preview">${escapeHTML(preview)}</p></button>
+    ${trashed ? `<div class="trash-actions"><button type="button" data-restore-note="${encodeId(note.id)}">↩ Wiederherstellen</button><button class="danger" type="button" data-permanent-delete="${encodeId(note.id)}">Endgültig löschen</button></div>` : `<div class="note-card-foot"><span class="folder-badge">${folder ? `📁 ${escapeHTML(folder)}` : "Ohne Ordner"}</span><time>${escapeHTML(formatUpdated(note.updatedAt || note.createdAt))}</time></div>`}
   </article>`;
 }
 
@@ -282,7 +299,7 @@ function renderNotes() {
   const queryText = normalizeSearch($("notes-search").value);
   const title = filterLabel();
   $("current-section-title").textContent = title;
-  $("current-section-label").textContent = activeFilter.type === "folder" ? "Privater Ordner" : "Private Notizen";
+  $("current-section-label").textContent = activeFilter.type === "folder" ? "Privater Ordner" : activeFilter.type === "trash" ? "Bis zur endgültigen Löschung" : "Private Notizen";
   $("visible-count").textContent = `${list.length} ${list.length === 1 ? "Notiz" : "Notizen"}`;
   $("notes-content").classList.toggle("list-view", viewMode === "list");
   $("toggle-view-btn").textContent = viewMode === "list" ? "▦" : "☷";
@@ -290,7 +307,8 @@ function renderNotes() {
 
   if (!list.length) {
     const searched = Boolean(queryText);
-    $("notes-content").innerHTML = `<div class="empty-state"><span class="empty-icon">${searched ? "⌕" : "🗒️"}</span><h2>${searched ? "Nichts gefunden" : "Noch keine Notiz"}</h2><p>${searched ? "Versuche einen anderen Suchbegriff." : "Erstelle hier deine erste private Notiz. Nur du kannst sie sehen."}</p>${searched ? "" : '<button class="primary-btn inline" type="button" data-empty-new-note>＋ Neue Notiz</button>'}</div>`;
+    const trash = activeFilter.type === "trash";
+    $("notes-content").innerHTML = `<div class="empty-state"><span class="empty-icon">${searched ? "⌕" : trash ? "🗑" : "🗒️"}</span><h2>${searched ? "Nichts gefunden" : trash ? "Papierkorb ist leer" : "Noch keine Notiz"}</h2><p>${searched ? "Versuche einen anderen Suchbegriff." : trash ? "Gelöschte Notizen können hier wiederhergestellt werden." : "Erstelle hier deine erste private Notiz. Nur du kannst sie sehen."}</p>${searched || trash ? "" : '<button class="primary-btn inline" type="button" data-empty-new-note>＋ Neue Notiz</button>'}</div>`;
     return;
   }
 
@@ -338,11 +356,14 @@ function setEditorColor(color) {
 
 function markEditorDirty() {
   editorDirty = true;
-  $("editor-status").textContent = "Nicht gespeichert";
+  $("editor-status").textContent = "Speichert automatisch …";
   setError("editor-error", "");
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => saveEditor({ closeAfter: false, silent: true }), 900);
 }
 
 function openEditor(note = null) {
+  clearTimeout(autosaveTimer);
   editingNoteId = note?.id || null;
   editorPinned = Boolean(note?.pinned);
   editorDirty = false;
@@ -361,58 +382,113 @@ function openEditor(note = null) {
   setTimeout(() => (note ? $("note-body") : $("note-title")).focus(), 50);
 }
 
-function requestCloseEditor() {
-  if (editorDirty && !confirm("Notiz ohne Speichern schliessen?")) return;
-  $("note-editor").hidden = true;
-  document.body.style.overflow = "";
-  editingNoteId = null;
-  editorDirty = false;
+async function requestCloseEditor() {
+  clearTimeout(autosaveTimer);
+  if (editorDirty) {
+    const saved = await saveEditor({ closeAfter: true, silent: true });
+    if (saved === false) return;
+  } else {
+    $("note-editor").hidden = true;
+    document.body.style.overflow = "";
+    editingNoteId = null;
+  }
 }
 
-async function saveEditor() {
+async function saveEditor({ closeAfter = true, silent = false } = {}) {
   if (!currentUser) return;
+  clearTimeout(autosaveTimer);
+  if (saveInFlight) {
+    saveQueued = {
+      closeAfter: Boolean(closeAfter || saveQueued?.closeAfter),
+      silent: Boolean(silent && (saveQueued?.silent ?? true))
+    };
+    return;
+  }
   const titleInput = $("note-title").value.trim();
   const contentHtml = sanitizeHTML($("note-body").innerHTML);
   const contentText = plainTextFromHTML(contentHtml);
   const title = titleInput || (contentText ? "Ohne Titel" : "");
-  if (!title && !contentText) return setError("editor-error", "Schreibe zuerst einen Titel oder eine Notiz.");
-  if (contentHtml.length > 140000 || contentText.length > 100000) return setError("editor-error", "Diese Notiz ist zu lang. Teile sie in zwei Notizen auf.");
+  if (!title && !contentText) {
+    if (closeAfter) {
+      $("note-editor").hidden = true;
+      document.body.style.overflow = "";
+      editingNoteId = null;
+      editorDirty = false;
+    }
+    return true;
+  }
+  if (contentHtml.length > 140000 || contentText.length > 100000) {
+    setError("editor-error", "Diese Notiz ist zu lang. Teile sie in zwei Notizen auf.");
+    return false;
+  }
   const folderId = folders.some(folder => folder.id === $("note-folder").value) ? $("note-folder").value : "";
   const button = $("save-note-btn");
-  setBusy(button, true, "Speichert …");
+  saveInFlight = true;
+  if (!silent) setBusy(button, true, "Speichert …");
   try {
-    const data = { title, contentHtml, contentText, folderId, color: editorColor, pinned: editorPinned, updatedAt: serverTimestamp() };
+    const data = { title, contentHtml, contentText, folderId, color: editorColor, pinned: editorPinned, trashed: false, trashedAt: null, updatedAt: serverTimestamp() };
     if (editingNoteId) {
       await updateDoc(doc(db, "notes", currentUser.uid, "items", editingNoteId), data);
     } else {
       data.createdAt = serverTimestamp();
-      await addDoc(collection(db, "notes", currentUser.uid, "items"), data);
+      const created = await addDoc(collection(db, "notes", currentUser.uid, "items"), data);
+      editingNoteId = created.id;
     }
     editorDirty = false;
-    $("note-editor").hidden = true;
-    document.body.style.overflow = "";
-    editingNoteId = null;
-    toast("✓ Notiz gespeichert");
+    $("editor-status").textContent = "Gespeichert";
+    if (closeAfter) {
+      $("note-editor").hidden = true;
+      document.body.style.overflow = "";
+      editingNoteId = null;
+    }
+    if (!silent) toast("✓ Notiz gespeichert");
+    return true;
   } catch (error) {
     console.error(error);
     setError("editor-error", "Die Notiz konnte nicht gespeichert werden. Prüfe die Verbindung und Firebase-Regeln.");
+    $("editor-status").textContent = "Nicht gespeichert";
+    return false;
   } finally {
-    setBusy(button, false);
+    saveInFlight = false;
+    if (!silent) setBusy(button, false);
+    if (saveQueued) {
+      const queuedOptions = saveQueued;
+      saveQueued = null;
+      autosaveTimer = setTimeout(() => saveEditor(queuedOptions), 100);
+    }
   }
 }
 
 async function deleteCurrentNote() {
-  if (!editingNoteId || !confirm("Diese Notiz wirklich löschen?")) return;
+  if (!editingNoteId || !confirm("Diese Notiz in den Papierkorb verschieben?")) return;
+  clearTimeout(autosaveTimer);
+  saveQueued = null;
+  while (saveInFlight) await new Promise(resolve => setTimeout(resolve, 40));
   try {
-    await deleteDoc(doc(db, "notes", currentUser.uid, "items", editingNoteId));
+    await updateDoc(doc(db, "notes", currentUser.uid, "items", editingNoteId), { trashed: true, trashedAt: serverTimestamp(), updatedAt: serverTimestamp() });
     editorDirty = false;
     $("note-editor").hidden = true;
     document.body.style.overflow = "";
     editingNoteId = null;
-    toast("Notiz gelöscht");
+    toast("Notiz in den Papierkorb verschoben");
   } catch {
     setError("editor-error", "Die Notiz konnte nicht gelöscht werden.");
   }
+}
+
+async function restoreNote(noteId) {
+  try {
+    await updateDoc(doc(db, "notes", currentUser.uid, "items", noteId), { trashed: false, trashedAt: null, updatedAt: serverTimestamp() });
+    toast("✓ Notiz wiederhergestellt");
+  } catch { toast("Die Notiz konnte nicht wiederhergestellt werden."); }
+}
+
+async function permanentlyDeleteNote(noteId) {
+  if (!confirm("Diese Notiz endgültig löschen? Das kann nicht rückgängig gemacht werden.")) return;
+  try {
+    await deleteDoc(doc(db, "notes", currentUser.uid, "items", noteId));
+    toast("Notiz endgültig gelöscht");
+  } catch { toast("Die Notiz konnte nicht gelöscht werden."); }
 }
 
 async function toggleQuickPin(noteId) {
@@ -483,6 +559,58 @@ async function removeFolder(folderId) {
   }
 }
 
+function textToEditorHtml(value) {
+  return String(value || "").split(/\n/).map(line => `<div>${escapeHTML(line) || "<br>"}</div>`).join("");
+}
+
+function handleDeepLink() {
+  if (deepLinkHandled || !notesReady || !foldersReady) return;
+  deepLinkHandled = true;
+  const params = new URLSearchParams(location.search);
+  const noteId = params.get("note");
+  if (noteId) {
+    const note = notes.find(item => item.id === noteId && !item.trashed);
+    if (note) openEditor(note);
+  } else if (params.get("new") === "1") {
+    const title = String(params.get("title") || "").slice(0, 160);
+    const body = String(params.get("body") || "").slice(0, 100000);
+    openEditor({ title, contentHtml: textToEditorHtml(body), contentText: body, folderId: "", color: "sand", pinned: false });
+    if (title || body) markEditorDirty();
+  }
+  if (noteId || params.get("new") === "1") history.replaceState({}, "", location.pathname);
+}
+
+function downloadFile(name, content, type = "text/plain;charset=utf-8") {
+  const anchor = document.createElement("a");
+  anchor.href = URL.createObjectURL(new Blob([content], { type }));
+  anchor.download = name;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+}
+
+function exportNotesText() {
+  const activeNotes = notes.filter(note => !note.trashed).sort((a, b) => (timestampDate(b.updatedAt)?.getTime() || 0) - (timestampDate(a.updatedAt)?.getTime() || 0));
+  if (!activeNotes.length) return toast("Es gibt noch keine Notizen zum Exportieren.");
+  const content = activeNotes.map(note => [
+    note.title || "Ohne Titel",
+    note.folderId ? `Ordner: ${folderName(note.folderId) || "Unbekannt"}` : "",
+    note.contentText || ""
+  ].filter(Boolean).join("\n")).join("\n\n────────────────────\n\n");
+  downloadFile(`G23f-Notes-${new Date().toISOString().slice(0, 10)}.txt`, content);
+  toast("✓ Notes als Textdatei exportiert");
+}
+
+function printNotesAsPdf() {
+  const activeNotes = notes.filter(note => !note.trashed);
+  if (!activeNotes.length) return toast("Es gibt noch keine Notizen zum Exportieren.");
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return toast("Erlaube Pop-ups, um als PDF zu speichern.");
+  printWindow.opener = null;
+  const cards = activeNotes.map(note => `<article><h2>${escapeHTML(note.title || "Ohne Titel")}</h2>${note.folderId ? `<small>Ordner: ${escapeHTML(folderName(note.folderId))}</small>` : ""}<div>${sanitizeHTML(note.contentHtml || "")}</div></article>`).join("");
+  printWindow.document.write(`<!doctype html><html lang="de"><head><title>G23f-Notes</title><style>body{max-width:800px;margin:30px auto;font:15px/1.6 system-ui;color:#211d19}h1{font-family:Georgia,serif}article{page-break-inside:avoid;border-top:1px solid #ccc;padding:18px 0}h2{font-size:20px}small{color:#666}@media print{body{margin:0}}</style></head><body><h1>G23f-Notes</h1>${cards}<script>window.onload=()=>window.print()<\/script></body></html>`);
+  printWindow.document.close();
+}
+
 function openSidebar() {
   $("notes-sidebar").classList.add("open");
   $("drawer-backdrop").hidden = false;
@@ -527,7 +655,6 @@ async function logout() {
 
 // Navigation and notes overview
 $("login-form").addEventListener("submit", handleLogin);
-$("logout-btn").addEventListener("click", logout);
 $("blocked-logout-btn").addEventListener("click", logout);
 $("open-sidebar-btn").addEventListener("click", openSidebar);
 $("close-sidebar-btn").addEventListener("click", closeSidebar);
@@ -564,7 +691,11 @@ $("toggle-view-btn").addEventListener("click", () => {
 $("notes-content").addEventListener("click", event => {
   const pin = event.target.closest("[data-quick-pin]");
   const open = event.target.closest("[data-open-note]");
+  const restore = event.target.closest("[data-restore-note]");
+  const permanentDelete = event.target.closest("[data-permanent-delete]");
   if (pin) return toggleQuickPin(decodeId(pin.dataset.quickPin));
+  if (restore) return restoreNote(decodeId(restore.dataset.restoreNote));
+  if (permanentDelete) return permanentlyDeleteNote(decodeId(permanentDelete.dataset.permanentDelete));
   if (open) {
     const note = notes.find(item => item.id === decodeId(open.dataset.openNote));
     if (note) openEditor(note);
@@ -575,7 +706,7 @@ $("notes-content").addEventListener("click", event => {
 
 // Editor
 $("close-editor-btn").addEventListener("click", requestCloseEditor);
-$("save-note-btn").addEventListener("click", saveEditor);
+$("save-note-btn").addEventListener("click", () => saveEditor({ closeAfter: true, silent: false }));
 $("delete-note-btn").addEventListener("click", deleteCurrentNote);
 $("pin-note-btn").addEventListener("click", () => {
   editorPinned = !editorPinned;
@@ -611,6 +742,8 @@ $("insert-check-btn").addEventListener("click", () => {
   document.execCommand("insertText", false, "☐ ");
   markEditorDirty();
 });
+$("export-notes-btn")?.addEventListener("click", exportNotesText);
+$("print-notes-btn")?.addEventListener("click", printNotesAsPdf);
 
 // Folders
 $("folder-form").addEventListener("submit", addFolder);
@@ -628,14 +761,5 @@ document.addEventListener("keydown", event => {
   else closeSidebar();
 });
 
-onAuthStateChanged(auth, user => {
-  if (authBusy) return;
-  if (user) loadSession(user);
-  else {
-    stopListeners();
-    currentUser = null;
-    currentProfile = null;
-    hideLoading();
-    showScreen("screen-login");
-  }
-});
+const protectedSession = await requireClassSession("../");
+if (protectedSession) await loadSession(protectedSession.user);

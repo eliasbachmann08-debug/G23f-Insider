@@ -1,24 +1,15 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
+  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
   deleteDoc, onSnapshot, query, where, serverTimestamp, Timestamp,
   runTransaction, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, onAuthStateChanged, browserLocalPersistence, setPersistence, deleteUser
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  signOut, deleteUser
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCe36w6HmFGScPaSjbFRkxrvuD9VCNrqDk",
-  authDomain: "g23f-studenplan.firebaseapp.com",
-  projectId: "g23f-studenplan",
-  storageBucket: "g23f-studenplan.firebasestorage.app",
-  messagingSenderId: "585686898310",
-  appId: "1:585686898310:web:3712285a4380ae380b6307"
-};
-
-const ADMIN_EMAIL = "eliasbachmann08@gmail.com";
+import { auth, db, isAdminUser } from "../shared/firebase.js";
+import { requireClassSession } from "../shared/session.js";
+import { mountGlobalShell } from "../shared/shell.js";
 
 const COLLECTIONS = {
   entries: "eintraege",
@@ -40,11 +31,6 @@ const TYPE_META = {
   test: { short: "Test", long: "Test / Prüfung", icon: "📝" },
   organisatorisch: { short: "Org.", long: "Organisatorisch", icon: "📌" }
 };
-
-const app = initializeApp(FIREBASE_CONFIG);
-const db = getFirestore(app);
-const auth = getAuth(app);
-await setPersistence(auth, browserLocalPersistence);
 
 const $ = id => document.getElementById(id);
 
@@ -70,11 +56,15 @@ let toastTimer = null;
 
 const entryUnsubscribers = [];
 let reportsUnsubscribe = null;
+let progressUnsubscribe = null;
+let completedEntryIds = new Set();
+let shellMounted = false;
+let deepLinkHandled = false;
 const entrySources = new Map();
 const sourceReady = new Set();
 
 function isAdmin() {
-  return currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return isAdminUser(currentUser);
 }
 
 function cleanName(value) {
@@ -217,6 +207,7 @@ function showScreen(id) {
   const inApp = id === "screen-app";
   document.body.classList.toggle("app-active", inApp);
   $("header-account").hidden = !inApp;
+  if ($("site-footer")) $("site-footer").hidden = !inApp;
 }
 
 function showLoading(message = "Lädt …") {
@@ -380,23 +371,13 @@ async function loadSession(user) {
     if (!isAdmin()) {
       const memberSnapshot = await getDoc(doc(db, COLLECTIONS.members, user.uid));
       if (!memberSnapshot.exists()) {
-        let oldName = "";
-        try {
-          const oldProfile = await getDoc(doc(db, COLLECTIONS.users, user.uid));
-          if (oldProfile.exists()) oldName = oldProfile.data().nickname || "";
-        } catch { /* profile may not exist yet */ }
-        $("join-name").value = oldName;
-        setError("join-error", "");
-        showScreen("screen-join");
-        hideLoading();
+        location.replace(`../?mode=join&returnTo=${encodeURIComponent(location.pathname + location.search)}`);
         return;
       }
       memberData = memberSnapshot.data();
       if (memberData.blocked) {
         await signOut(auth);
-        setError("login-error", "Dieses Konto wurde gesperrt. Melde dich bei Elias.");
-        showScreen("screen-login");
-        hideLoading();
+        location.replace("../?error=blocked");
         return;
       }
     }
@@ -416,21 +397,31 @@ async function loadSession(user) {
     showScreen("screen-app");
     renderCalendar();
     startEntryListeners();
-    if (isAdmin()) startReportsListener();
-    else stopReportsListener();
+    startProgressListener();
+    if (!shellMounted) {
+      mountGlobalShell({
+        user: currentUser,
+        profile: currentProfile,
+        rootPath: "../",
+        pageLabel: "Stundenplan",
+        onProfileUpdated: profile => {
+          currentProfile = profile;
+          const own = allUsers.find(item => item.uid === currentUser.uid);
+          if (own) Object.assign(own, profile);
+        }
+      });
+      shellMounted = true;
+    }
   } catch (error) {
     console.error(error);
-    setError("login-error", "Das Konto konnte nicht geladen werden. Prüfe die Firebase-Regeln oder melde dich bei Elias.");
-    showScreen("screen-login");
+    location.replace("../?error=session");
   } finally {
     hideLoading();
   }
 }
 
 function updateHeaderProfile() {
-  $("header-avatar").innerHTML = avatarHTML(currentProfile);
-  $("header-name").textContent = currentProfile?.nickname || "Profil";
-  $("reports-btn").hidden = !isAdmin();
+  // The shared profile component renders the same account button on every page.
 }
 
 async function loadSubjects() {
@@ -465,6 +456,20 @@ function stopEntryListeners() {
   entrySources.clear();
   sourceReady.clear();
   entries = [];
+}
+
+function stopProgressListener() {
+  if (progressUnsubscribe) progressUnsubscribe();
+  progressUnsubscribe = null;
+  completedEntryIds = new Set();
+}
+
+function startProgressListener() {
+  stopProgressListener();
+  progressUnsubscribe = onSnapshot(collection(db, "entryProgress", currentUser.uid, "items"), snapshot => {
+    completedEntryIds = new Set(snapshot.docs.filter(item => item.data().completed).map(item => item.id));
+    renderCalendar();
+  }, error => console.warn("Persönlicher Erledigt-Status nicht geladen", error));
 }
 
 function startEntryListeners() {
@@ -520,6 +525,28 @@ function mergeEntrySources() {
   });
   renderCalendar();
   if (isAdmin() && !$("reports-modal").hidden) renderReports();
+  if (sourceReady.size === 3) handleDeepLink();
+}
+
+function handleDeepLink() {
+  if (deepLinkHandled) return;
+  deepLinkHandled = true;
+  const params = new URLSearchParams(location.search);
+  const requestedDate = params.get("date");
+  if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+    selectedDate = parseDate(requestedDate);
+    activeDay = parseDate(requestedDate);
+    renderCalendar(true);
+  }
+  if (params.get("new") === "1") {
+    openAddEntry();
+    return;
+  }
+  const requestedEntry = params.get("entry");
+  if (requestedEntry && entries.some(item => item.id === requestedEntry)) {
+    openEntryDetail(requestedEntry);
+    requestAnimationFrame(() => $("agenda-section").scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 }
 
 async function migrateLegacyEntries() {
@@ -543,6 +570,7 @@ async function migrateLegacyEntries() {
     if (entry.dateTo === undefined) {
       patch.dateTo = entry.type === "organisatorisch" ? entry.date : null;
     }
+    if (entry.linkUrl === undefined) patch.linkUrl = "";
 
     const legacyEditor = entry.editedBy || null;
     const legacyEditorProfile = legacyEditor
@@ -605,10 +633,11 @@ function eventBars(list, maximum = 4) {
 }
 
 function compactEntryHTML(entry, className = "calendar-entry") {
+  const completed = entry.type === "hausaufgabe" && completedEntryIds.has(entry.id);
   const label = className === "agenda-entry"
-    ? `<span class="entry-main"><span class="entry-label">${escapeHTML(entryTitle(entry))}</span><span class="entry-tap-hint">Antippen für genauere Infos</span></span>`
+    ? `<span class="entry-main"><span class="entry-label">${completed ? "✓ " : ""}${escapeHTML(entryTitle(entry))}</span><span class="entry-tap-hint">Antippen für genauere Infos</span></span>`
     : `<span class="entry-label">${escapeHTML(entryTitle(entry))}</span>`;
-  return `<button class="${className} ${escapeHTML(entry.type)}" type="button" data-entry-id="${safeId(entry.id)}">
+  return `<button class="${className} ${escapeHTML(entry.type)} ${completed ? "completed" : ""}" type="button" data-entry-id="${safeId(entry.id)}">
     <span class="entry-kind">${escapeHTML(typeKind(entry))}</span>
     ${label}
     ${className === "agenda-entry" ? '<span class="entry-chevron">›</span>' : ""}
@@ -736,6 +765,7 @@ function normalizedSearchText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("de-CH")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -907,6 +937,7 @@ async function openAddEntry() {
   $("entry-date-to").value = dateString(entryDate);
   $("entry-topic").value = "";
   $("entry-info").value = "";
+  $("entry-link").value = "";
   $("people-search").value = "";
   setError("entry-error", "");
   setError("people-error", "");
@@ -930,6 +961,7 @@ function openEditEntry(entryId) {
   if (entry.fach && subjects.includes(entry.fach)) $("entry-subject").value = entry.fach;
   $("entry-topic").value = entry.thema || "";
   $("entry-info").value = entry.infos || "";
+  $("entry-link").value = entry.linkUrl || "";
   selectedPeople = (entry.visibleToUids || []).map(uid => {
     const profile = profileFor(uid);
     return profile ? { uid, nickname: profile.nickname } : null;
@@ -955,11 +987,20 @@ async function saveEntry(event) {
   const subject = organisational ? "" : $("entry-subject").value;
   const topic = $("entry-topic").value.trim();
   const info = $("entry-info").value.trim();
+  const linkUrl = $("entry-link").value.trim();
 
   if (!date) return setError("entry-error", "Wähle ein Datum aus.");
   if (organisational && dateTo && dateTo < date) return setError("entry-error", "Das Enddatum muss nach dem Startdatum liegen.");
   if (!topic) return setError("entry-error", organisational ? "Gib das Ereignis ein." : "Gib den Auftrag oder das Thema ein.");
   if (!organisational && !subject) return setError("entry-error", "Wähle ein Fach aus.");
+  if (linkUrl) {
+    try {
+      const parsed = new URL(linkUrl);
+      if (parsed.protocol !== "https:") throw new Error("protocol");
+    } catch {
+      return setError("entry-error", "Der Link muss vollständig sein und mit https:// beginnen.");
+    }
+  }
   if (selectedVisibility === "auswahl") {
     if (!selectedPeople.length) return setError("people-error", "Wähle mindestens ein vorhandenes Konto aus.");
     const invalid = selectedPeople.some(person => !allUsers.some(user => user.uid === person.uid));
@@ -972,6 +1013,16 @@ async function saveEntry(event) {
   setButtonBusy(button, true, "Speichert …");
 
   try {
+    if (!editingEntryId) {
+      const duplicate = entries.find(item =>
+        item.type === selectedType && item.date === date &&
+        normalizedSearchText(`${item.fach || ""} ${item.thema || ""}`) === normalizedSearchText(`${subject} ${topic}`)
+      );
+      if (duplicate && !confirm("Ein sehr ähnlicher Eintrag existiert an diesem Tag bereits. Trotzdem speichern?")) {
+        setButtonBusy(button, false);
+        return;
+      }
+    }
     if (editingEntryId) {
       const original = entries.find(item => item.id === editingEntryId);
       if (!original || !canManageEntry(original)) throw new Error("permission-denied");
@@ -982,6 +1033,7 @@ async function saveEntry(event) {
         fach: subject,
         thema: topic,
         infos: info,
+        linkUrl,
         visibility: selectedVisibility,
         visibleToUids,
         visibleToNames,
@@ -1004,6 +1056,7 @@ async function saveEntry(event) {
         fach: subject,
         thema: topic,
         infos: info,
+        linkUrl,
         authorUid: currentUser.uid,
         authorName: currentProfile.nickname,
         visibility: selectedVisibility,
@@ -1047,6 +1100,77 @@ function visibilityText(entry) {
   return "🌍 Für die ganze Klasse sichtbar";
 }
 
+function safeLink(value) {
+  try {
+    const parsed = new URL(String(value || ""));
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch { return ""; }
+}
+
+function icsEscape(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function icsDate(value) {
+  return String(value || "").replace(/-/g, "");
+}
+
+function dayAfter(value) {
+  const date = parseDate(value);
+  date.setDate(date.getDate() + 1);
+  return dateString(date);
+}
+
+function exportEntryToCalendar(entry) {
+  const link = safeLink(entry.linkUrl);
+  const description = [entry.thema, entry.infos, link].filter(Boolean).join("\n\n");
+  const content = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//G23f-Insider//DE",
+    "BEGIN:VEVENT", `UID:${icsEscape(entry.id)}@g23f-insider.ch`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")}`,
+    `DTSTART;VALUE=DATE:${icsDate(entry.date)}`,
+    `DTEND;VALUE=DATE:${icsDate(dayAfter(entry.dateTo || entry.date))}`,
+    `SUMMARY:${icsEscape(entryTitle(entry))}`,
+    `DESCRIPTION:${icsEscape(description)}`,
+    link ? `URL:${icsEscape(link)}` : "",
+    "END:VEVENT", "END:VCALENDAR"
+  ].filter(Boolean).join("\r\n");
+  const anchor = document.createElement("a");
+  anchor.href = URL.createObjectURL(new Blob([content], { type: "text/calendar;charset=utf-8" }));
+  anchor.download = `${entryTitle(entry).replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "G23f-Termin"}.ics`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+  toast("✓ Kalenderdatei erstellt");
+}
+
+function createNoteFromEntry(entry) {
+  const params = new URLSearchParams({
+    new: "1",
+    title: `${entryTitle(entry)} – ${shortDate(parseDate(entry.date))}`,
+    body: [entry.thema, entry.infos, safeLink(entry.linkUrl)].filter(Boolean).join("\n\n"),
+    fromEntry: entry.id
+  });
+  location.href = `../notes/?${params.toString()}`;
+}
+
+async function toggleEntryCompleted(entry) {
+  const completed = !completedEntryIds.has(entry.id);
+  try {
+    await setDoc(doc(db, "entryProgress", currentUser.uid, "items", entry.id), {
+      entryId: entry.id,
+      completed,
+      updatedAt: serverTimestamp()
+    });
+    if (completed) completedEntryIds.add(entry.id);
+    else completedEntryIds.delete(entry.id);
+    renderCalendar();
+    toast(completed ? "✓ Als erledigt markiert" : "Wieder als offen markiert");
+    setTimeout(() => openEntryDetail(entry.id), 120);
+  } catch {
+    toast("⚠️ Der persönliche Status konnte nicht gespeichert werden");
+  }
+}
+
 function openEntryDetail(entryId) {
   const entry = entries.find(item => item.id === entryId);
   if (!entry) return;
@@ -1059,6 +1183,8 @@ function openEntryDetail(entryId) {
   const canReport = entry.authorUid !== currentUser.uid;
   const created = formatTimestamp(entry.createdAt || entry.ts);
   const edited = formatTimestamp(entry.editedAt);
+  const link = safeLink(entry.linkUrl);
+  const completed = completedEntryIds.has(entry.id);
 
   $("detail-content").innerHTML = `
     <span class="detail-type ${escapeHTML(entry.type)}">${escapeHTML(meta.icon)} ${escapeHTML(meta.long)}</span>
@@ -1067,6 +1193,7 @@ function openEntryDetail(entryId) {
     <div class="detail-visibility">${escapeHTML(visibilityText(entry))}</div>
     ${entry.type !== "organisatorisch" && entry.thema ? `<section class="detail-section"><h3>Auftrag / Thema</h3><p>${escapeHTML(entry.thema)}</p></section>` : ""}
     ${entry.infos ? `<section class="detail-section"><h3>Zusätzliche Infos</h3><p>${escapeHTML(entry.infos)}</p></section>` : ""}
+    ${link ? `<section class="detail-section"><h3>Link</h3><p><a class="detail-link" href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer">Link öffnen ↗</a></p></section>` : ""}
     <button class="detail-author" id="detail-author-btn" type="button">
       ${avatarHTML(author)}
       <span><strong>${escapeHTML(author.nickname || entry.authorName || "Unbekannt")}</strong><span>Profil öffnen</span></span>
@@ -1076,12 +1203,18 @@ function openEntryDetail(entryId) {
       ${entry.editedByName ? `<br>Bearbeitet von ${escapeHTML(entry.editedByName)}${edited ? `: ${escapeHTML(edited)}` : ""}` : ""}
     </div>
     <div class="detail-actions">
+      ${entry.type === "hausaufgabe" ? `<button class="action-btn ${completed ? "completed-action" : ""}" id="detail-complete-btn" type="button">${completed ? "✓ Erledigt" : "○ Als erledigt markieren"}</button>` : ""}
+      <button class="action-btn compact-action" id="detail-calendar-btn" type="button" title="In persönlichen Kalender speichern">📆 Kalender</button>
+      <button class="action-btn compact-action" id="detail-note-btn" type="button">🗒️ Private Notiz</button>
       ${canManage ? '<button class="action-btn" id="detail-edit-btn" type="button">✏️ Bearbeiten</button>' : ""}
       ${canManage ? '<button class="action-btn danger" id="detail-delete-btn" type="button">🗑 Löschen</button>' : ""}
       ${canReport ? '<button class="action-btn danger" id="detail-report-btn" type="button">⚑ Eintrag melden</button>' : ""}
     </div>`;
 
   $("detail-author-btn").addEventListener("click", () => openProfile(author.uid));
+  $("detail-complete-btn")?.addEventListener("click", () => toggleEntryCompleted(entry));
+  $("detail-calendar-btn")?.addEventListener("click", () => exportEntryToCalendar(entry));
+  $("detail-note-btn")?.addEventListener("click", () => createNoteFromEntry(entry));
   $("detail-edit-btn")?.addEventListener("click", () => openEditEntry(entry.id));
   $("detail-delete-btn")?.addEventListener("click", () => deleteEntry(entry.id));
   $("detail-report-btn")?.addEventListener("click", () => openReport("entry", entry.id, entryTitle(entry)));
@@ -1413,6 +1546,7 @@ async function handleExistingAccountJoin(event) {
 async function logout() {
   sessionRun += 1;
   stopEntryListeners();
+  stopProgressListener();
   stopReportsListener();
   closeAllModals();
   currentUser = null;
@@ -1430,9 +1564,6 @@ $("join-form").addEventListener("submit", handleExistingAccountJoin);
 $("show-register-btn").addEventListener("click", () => { setError("register-error", ""); showScreen("screen-register"); });
 $("show-login-btn").addEventListener("click", () => { setError("login-error", ""); showScreen("screen-login"); });
 $("join-logout-btn").addEventListener("click", logout);
-$("logout-btn").addEventListener("click", logout);
-$("own-profile-btn").addEventListener("click", () => currentUser && openProfile(currentUser.uid));
-$("reports-btn").addEventListener("click", openReportsCenter);
 
 // Calendar events
 $("previous-period-btn").addEventListener("click", () => navigatePeriod(-1));
@@ -1552,15 +1683,5 @@ $("reports-list").addEventListener("click", event => {
   }
 });
 
-onAuthStateChanged(auth, user => {
-  if (authFlowBusy) return;
-  if (user) loadSession(user);
-  else {
-    currentUser = null;
-    currentProfile = null;
-    stopEntryListeners();
-    stopReportsListener();
-    hideLoading();
-    showScreen("screen-login");
-  }
-});
+const protectedSession = await requireClassSession("../");
+if (protectedSession) await loadSession(protectedSession.user);

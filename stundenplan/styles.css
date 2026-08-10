@@ -1048,6 +1048,25 @@ textarea:focus {
   font-size: .72rem;
 }
 
+.footer-feedback-btn {
+  padding: .34rem .55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.calendar-entry.completed,
+.agenda-entry.completed { opacity: .62; }
+.calendar-entry.completed .entry-label,
+.agenda-entry.completed .entry-label { text-decoration: line-through; }
+.detail-link { color: var(--accent-dark); font-weight: 700; overflow-wrap: anywhere; }
+.action-btn.compact-action { padding-inline: .65rem; font-size: .7rem; }
+.action-btn.completed-action { border-color: rgba(45,112,64,.25); background: #e7f3e9; color: #2d7040; }
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

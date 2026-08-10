@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Biologie – G23f-Insider</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧬</text></svg>">
+<link rel="stylesheet" href="../../shared/shell.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap');
 
@@ -39,6 +40,7 @@
     align-items: center;
     gap: 1rem;
   }
+  .header-account { margin-left: auto; display: flex; align-items: center; gap: .4rem; }
   .back-btn {
     color: var(--muted);
     text-decoration: none;
@@ -57,6 +59,8 @@
     color: var(--accent);
     font-weight: 600;
   }
+  .breadcrumb-separator { opacity:.4; margin:0 .25rem; }
+  .empty-load { color:var(--muted); font-size:.85rem; padding:1rem; }
 
   .page-hero {
     max-width: 1100px;
@@ -210,6 +214,11 @@
     font-size: 0.78rem;
     border-top: 1px solid var(--border);
   }
+  footer button { padding:.34rem .55rem; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--muted); cursor:pointer; font-size:.68rem; font-weight:600; }
+  .loading-layer { position:fixed; inset:0; z-index:1000; display:grid; place-content:center; gap:.7rem; background:rgba(245,241,234,.9); color:var(--muted); text-align:center; backdrop-filter:blur(4px); font-size:.78rem; }
+  .spinner { width:32px; height:32px; margin:auto; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  [hidden] { display:none !important; }
 
   @media (max-width: 600px) {
     .topics-grid { grid-template-columns: 1fr; }
@@ -218,12 +227,18 @@
 </head>
 <body>
 
+<div id="page-content" hidden>
+
 <header>
   <a href="../../index.html" class="back-btn">← Zurück</a>
   <div class="breadcrumb">
     <span>G23f-Insider</span>
-    <span style="opacity:.4;margin:0 .25rem;">/</span>
+    <span class="breadcrumb-separator">/</span>
     <span class="cur">Biologie</span>
+  </div>
+  <div class="header-account">
+    <button type="button" data-g23f-admin hidden aria-label="Admin-Inbox öffnen">📥</button>
+    <button type="button" data-g23f-profile hidden aria-label="Eigenes Profil öffnen"></button>
   </div>
 </header>
 
@@ -236,43 +251,17 @@
 <main class="section">
   <div class="section-title">Themen</div>
   <div class="topics-grid" id="topics-grid">
-    <div style="color:var(--muted);font-size:.85rem;padding:1rem;">Lädt…</div>
+    <div class="empty-load">Lädt…</div>
   </div>
 </main>
 
 <footer>
-  G23f-Insider · Alle Rechte vorbehalten · Fragen oder Ergänzungen? Einfach bei Elias melden
+  G23f-Insider · Alle Rechte vorbehalten · <button type="button" data-g23f-feedback>💬 Fehler oder Idee melden</button>
 </footer>
+</div>
 
-<script>
-fetch('themen.json')
-  .then(r => r.json())
-  .then(themen => {
-    const grid = document.getElementById('topics-grid');
-    if (!themen.length) {
-      grid.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:1rem;">Noch keine Themen verfügbar.</div>';
-      return;
-    }
-    grid.innerHTML = themen.map((t, i) => `
-      <a href="${t.pfad}" class="topic-card">
-        <div class="topic-card-head">
-          <span class="topic-num">BIO-${String(i+1).padStart(2,'0')}</span>
-          <div class="mode-pills">
-            ${t.theorie ? '<span class="mode-pill t">Theorie</span>' : ''}
-            ${t.karten  ? '<span class="mode-pill k">Karten</span>'  : ''}
-            ${t.quiz    ? '<span class="mode-pill q">Quiz</span>'    : ''}
-          </div>
-        </div>
-        <h3>${t.name}</h3>
-        <p>${t.beschreibung || ''}</p>
-        <span class="open-btn">Lernapp öffnen →</span>
-      </a>
-    `).join('');
-  })
-  .catch(() => {
-    document.getElementById('topics-grid').innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:1rem;">Themen konnten nicht geladen werden.</div>';
-  });
-</script>
+<div class="loading-layer" id="loading-layer"><div class="spinner"></div><span>Anmeldung wird geprüft …</span></div>
+<script type="module" src="app.js"></script>
 
 </body>
 </html>

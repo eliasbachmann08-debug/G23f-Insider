@@ -11,19 +11,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../shared/shell.css">
 </head>
 <body>
   <header class="site-header">
     <a href="../index.html" class="back-btn" aria-label="Zurück zur Startseite">← <span>Zurück</span></a>
     <div class="brand-path"><strong>G23f-Insider</strong><span>/</span><span>Notes</span></div>
     <div class="header-account" id="header-account" hidden>
-      <span class="profile-chip"><span class="avatar" id="header-avatar">?</span><span id="header-name">Profil</span></span>
-      <button class="logout-btn" id="logout-btn" type="button">Abmelden</button>
+      <button class="icon-btn" type="button" data-g23f-admin aria-label="Admin-Inbox öffnen" hidden>📥</button>
+      <button class="profile-chip" type="button" data-g23f-profile aria-label="Eigenes Profil öffnen"></button>
+      <button class="logout-btn" id="logout-btn" type="button" data-g23f-logout>Abmelden</button>
     </div>
   </header>
 
   <main>
-    <section class="screen active" id="screen-login">
+    <section class="screen" id="screen-login" hidden>
       <div class="auth-wrap">
         <div class="auth-icon">🗒️</div>
         <p class="eyebrow">Nur für dich</p>
@@ -41,7 +43,7 @@
       </div>
     </section>
 
-    <section class="screen" id="screen-blocked">
+    <section class="screen" id="screen-blocked" hidden>
       <div class="auth-wrap">
         <div class="auth-icon">🔒</div>
         <p class="eyebrow">Kein Zugriff</p>
@@ -63,13 +65,14 @@
           <nav class="sidebar-nav">
             <button class="sidebar-item active" type="button" data-note-filter="all"><span>🗒️ Alle Notizen</span><strong id="all-count">0</strong></button>
             <button class="sidebar-item" type="button" data-note-filter="pinned"><span>☆ Angeheftet</span><strong id="pinned-count">0</strong></button>
+            <button class="sidebar-item" type="button" data-note-filter="trash"><span>🗑 Papierkorb</span><strong id="trash-count">0</strong></button>
           </nav>
           <div class="folders-head">
             <span>Ordner</span>
             <button class="small-icon-btn" id="manage-folders-btn" type="button" aria-label="Ordner verwalten">＋</button>
           </div>
           <div class="folder-list" id="folder-list"></div>
-          <p class="privacy-note">🔒 Alle Notizen sind nur für dein Konto sichtbar – auch Elias kann sie nicht lesen.</p>
+          <p class="privacy-note">🔒 Alle Notizen sind nur für dein Konto sichtbar. Andere Nutzer und Elias können sie in der App nicht sehen.</p>
         </aside>
 
         <div class="notes-main">
@@ -83,6 +86,8 @@
             <div class="topbar-actions">
               <button class="icon-btn" id="toggle-search-btn" type="button" aria-label="Notizen suchen">⌕</button>
               <button class="icon-btn" id="toggle-view-btn" type="button" aria-label="Ansicht wechseln">▦</button>
+              <button class="icon-btn" id="export-notes-btn" type="button" aria-label="Notes als Text exportieren" title="Text exportieren">⇩</button>
+              <button class="icon-btn" id="print-notes-btn" type="button" aria-label="Notes drucken oder als PDF speichern" title="Drucken / PDF">⎙</button>
               <button class="new-note-btn desktop-new" id="desktop-new-note-btn" type="button">＋ Neue Notiz</button>
             </div>
           </div>
@@ -102,6 +107,8 @@
     </section>
   </main>
 
+  <footer class="site-footer" id="site-footer" hidden>G23f-Insider · <button type="button" data-g23f-feedback>💬 Fehler oder Idee melden</button></footer>
+
   <div class="editor-backdrop" id="note-editor" hidden>
     <section class="note-editor" role="dialog" aria-modal="true" aria-labelledby="note-title">
       <header class="editor-header">
@@ -117,16 +124,18 @@
         <label for="note-folder">Ordner</label>
         <select id="note-folder"><option value="">Kein Ordner</option></select>
         <div class="color-picker" id="color-picker" role="group" aria-label="Notizfarbe">
-          <button class="color-dot selected" type="button" data-note-color="sand" aria-label="Sand" style="--dot:#fffdf9"></button>
-          <button class="color-dot" type="button" data-note-color="yellow" aria-label="Gelb" style="--dot:#fff2be"></button>
-          <button class="color-dot" type="button" data-note-color="rose" aria-label="Rosa" style="--dot:#f8dfe6"></button>
-          <button class="color-dot" type="button" data-note-color="blue" aria-label="Blau" style="--dot:#dfeef3"></button>
-          <button class="color-dot" type="button" data-note-color="green" aria-label="Grün" style="--dot:#e1efdf"></button>
-          <button class="color-dot" type="button" data-note-color="violet" aria-label="Violett" style="--dot:#e9e2f4"></button>
+          <button class="color-dot selected" type="button" data-note-color="sand" aria-label="Sand"></button>
+          <button class="color-dot" type="button" data-note-color="yellow" aria-label="Gelb"></button>
+          <button class="color-dot" type="button" data-note-color="rose" aria-label="Rosa"></button>
+          <button class="color-dot" type="button" data-note-color="blue" aria-label="Blau"></button>
+          <button class="color-dot" type="button" data-note-color="green" aria-label="Grün"></button>
+          <button class="color-dot" type="button" data-note-color="violet" aria-label="Violett"></button>
         </div>
       </div>
 
       <input class="note-title-input" id="note-title" type="text" maxlength="160" placeholder="Titel">
+      <!-- Rich-Text-Editor benötigt contenteditable. -->
+      <!-- [html-validate-disable-next prefer-native-element] -->
       <div class="note-body-input" id="note-body" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Notiz schreiben …"></div>
 
       <div class="format-toolbar" id="format-toolbar" role="toolbar" aria-label="Text formatieren">
@@ -158,7 +167,7 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <div class="loading-layer" id="loading-layer" hidden><div class="spinner"></div><span id="loading-text">Lädt …</span></div>
+  <div class="loading-layer" id="loading-layer"><div class="spinner"></div><span id="loading-text">Anmeldung wird geprüft …</span></div>
 
   <script type="module" src="app.js"></script>
 </body>

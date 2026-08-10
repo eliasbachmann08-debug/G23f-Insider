@@ -1,7 +1,9 @@
-const CACHE_NAME = "g23f-insider-v3";
+const CACHE_NAME = "g23f-insider-v5-2026-08-10";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./styles.css",
+  "./app.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -11,8 +13,13 @@ const APP_SHELL = [
   "./notes/index.html",
   "./notes/styles.css",
   "./notes/app.js",
+  "./shared/firebase.js",
+  "./shared/session.js",
+  "./shared/shell.css",
+  "./shared/shell.js",
   "./faecher/faecher.json",
   "./faecher/biologie/index.html",
+  "./faecher/biologie/app.js",
   "./faecher/biologie/themen.json"
 ];
 
@@ -20,8 +27,11 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
   );
+});
+
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {

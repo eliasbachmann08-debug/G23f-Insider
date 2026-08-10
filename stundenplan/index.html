@@ -11,24 +11,23 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../shared/shell.css">
 </head>
 <body>
   <header class="site-header">
     <a href="../index.html" class="back-btn" aria-label="Zurück zur Startseite">← <span>Zurück</span></a>
     <div class="brand-path"><strong>G23f-Insider</strong><span>/</span><span>Stundenplan</span></div>
     <div class="header-account" id="header-account" hidden>
-      <button class="icon-btn reports-btn" id="reports-btn" type="button" aria-label="Meldungen öffnen" hidden>
-        🛡️<span class="count-badge" id="report-count" hidden>0</span>
+      <button class="icon-btn reports-btn" type="button" data-g23f-admin aria-label="Admin-Inbox öffnen" hidden>
+        📥<span class="count-badge" id="report-count" hidden>0</span>
       </button>
-      <button class="profile-chip" id="own-profile-btn" type="button" aria-label="Eigenes Profil öffnen">
-        <span id="header-avatar"></span><span id="header-name"></span>
-      </button>
-      <button class="logout-btn" id="logout-btn" type="button">Abmelden</button>
+      <button class="profile-chip" id="own-profile-btn" type="button" data-g23f-profile aria-label="Eigenes Profil öffnen"></button>
+      <button class="logout-btn" id="logout-btn" type="button" data-g23f-logout>Abmelden</button>
     </div>
   </header>
 
   <main>
-    <section class="screen active" id="screen-login">
+    <section class="screen" id="screen-login" hidden>
       <div class="auth-wrap">
         <div class="auth-icon">📅</div>
         <p class="eyebrow">G23f-Insider</p>
@@ -46,7 +45,7 @@
       </div>
     </section>
 
-    <section class="screen" id="screen-register">
+    <section class="screen" id="screen-register" hidden>
       <div class="auth-wrap auth-wrap-wide">
         <div class="auth-icon">✨</div>
         <p class="eyebrow">Einmalige Registrierung</p>
@@ -74,7 +73,7 @@
       </div>
     </section>
 
-    <section class="screen" id="screen-join">
+    <section class="screen" id="screen-join" hidden>
       <div class="auth-wrap auth-wrap-wide">
         <div class="auth-icon">🔐</div>
         <p class="eyebrow">Einmalige Umstellung</p>
@@ -149,7 +148,7 @@
     </section>
   </main>
 
-  <footer class="site-footer">G23f-Insider · Fragen oder Ergänzungen? Einfach bei Elias melden</footer>
+  <footer class="site-footer" id="site-footer" hidden>G23f-Insider · <button class="footer-feedback-btn" type="button" data-g23f-feedback>💬 Fehler oder Idee melden</button></footer>
 
   <div class="modal-backdrop" id="entry-modal" hidden>
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
@@ -193,6 +192,11 @@
         <div class="form-row">
           <label for="entry-info">Zusätzliche Infos <span class="optional">optional</span></label>
           <textarea id="entry-info" rows="3" maxlength="3000" placeholder="z. B. Lernziele, Kapitel oder Hinweise"></textarea>
+        </div>
+
+        <div class="form-row">
+          <label for="entry-link">Passender Link <span class="optional">optional</span></label>
+          <input id="entry-link" type="url" maxlength="500" inputmode="url" placeholder="https://… (z. B. Teams oder OneDrive)">
         </div>
 
         <div class="form-row">
@@ -288,7 +292,7 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <div class="loading-layer" id="loading-layer" hidden><div class="spinner"></div><span id="loading-text">Lädt …</span></div>
+  <div class="loading-layer" id="loading-layer"><div class="spinner"></div><span id="loading-text">Anmeldung wird geprüft …</span></div>
 
   <script type="module" src="app.js"></script>
 </body>
