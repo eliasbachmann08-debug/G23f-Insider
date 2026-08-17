@@ -25,8 +25,12 @@ export async function requireClassSession(loginUrl) {
   }
 
   let member = null;
+  const profilePromise = getDoc(doc(db, "users", user.uid));
   if (!isAdminUser(user)) {
-    const memberSnapshot = await getDoc(doc(db, "members", user.uid));
+    const [memberSnapshot, profileSnapshot] = await Promise.all([
+      getDoc(doc(db, "members", user.uid)),
+      profilePromise
+    ]);
     if (!memberSnapshot.exists()) {
       location.replace(`${loginUrl}?mode=join&returnTo=${encodeURIComponent(currentReturnPath())}`);
       return null;
@@ -37,12 +41,16 @@ export async function requireClassSession(loginUrl) {
       location.replace(`${loginUrl}?error=blocked`);
       return null;
     }
+    const profile = profileSnapshot.exists()
+      ? { uid: user.uid, ...profileSnapshot.data() }
+      : { uid: user.uid, nickname: member.nickname || "Profil", photoData: null };
+    return { user, member, profile, admin: false };
   }
 
-  const profileSnapshot = await getDoc(doc(db, "users", user.uid));
+  const profileSnapshot = await profilePromise;
   const profile = profileSnapshot.exists()
     ? { uid: user.uid, ...profileSnapshot.data() }
-    : { uid: user.uid, nickname: isAdminUser(user) ? "Elias" : (member?.nickname || "Profil"), photoData: null };
+    : { uid: user.uid, nickname: "Elias", photoData: null };
 
-  return { user, member, profile, admin: isAdminUser(user) };
+  return { user, member, profile, admin: true };
 }

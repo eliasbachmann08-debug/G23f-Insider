@@ -65,16 +65,16 @@ function toast(message) {
   if (!element) {
     element = document.createElement("div");
     element.id = "g23f-shell-toast";
-    element.style.cssText = "position:fixed;left:50%;bottom:max(1rem,env(safe-area-inset-bottom));z-index:2000;max-width:calc(100% - 2rem);padding:.7rem 1rem;border-radius:999px;background:#1f1b17;color:#fff;transform:translate(-50%,18px);opacity:0;transition:.2s;font:500 .74rem/1.4 Inter,sans-serif;text-align:center;pointer-events:none";
+    element.style.cssText = "position:fixed;right:1rem;top:max(4.8rem,calc(env(safe-area-inset-top) + 4.8rem));z-index:2000;width:max-content;max-width:min(390px,calc(100% - 2rem));padding:.7rem 1rem;border-radius:12px;background:#1f1b17;color:#fff;transform:translateY(-12px);opacity:0;transition:.2s;font:500 .74rem/1.4 Inter,sans-serif;text-align:left;pointer-events:none";
     document.body.append(element);
   }
   clearTimeout(toastTimer);
   element.textContent = message;
   element.style.opacity = "1";
-  element.style.transform = "translate(-50%,0)";
+  element.style.transform = "translateY(0)";
   toastTimer = setTimeout(() => {
     element.style.opacity = "0";
-    element.style.transform = "translate(-50%,18px)";
+    element.style.transform = "translateY(-12px)";
   }, 3200);
 }
 
@@ -131,13 +131,15 @@ function injectShell() {
         <div class="g23f-admin-section" id="g23f-admin-content"></div>
       </section>
     </div>
-    <div class="g23f-update-banner" id="g23f-update-banner" hidden>
-      <span>Eine neue Version ist verfügbar.</span>
-      <button class="g23f-shell-btn primary" id="g23f-update-btn" type="button">Aktualisieren</button>
-    </div>
-    <div class="g23f-verify-banner" id="g23f-verify-banner" hidden>
-      <span>Bestätige noch deine E-Mail-Adresse.</span>
-      <button class="g23f-shell-btn" id="g23f-resend-verification" type="button">Mail erneut senden</button>
+    <div class="g23f-notification-stack">
+      <div class="g23f-verify-banner" id="g23f-verify-banner" hidden>
+        <span>Bestätige noch deine E-Mail-Adresse. Falls die Mail fehlt, prüfe auch den Spam-Ordner.</span>
+        <button class="g23f-shell-btn" id="g23f-resend-verification" type="button">Mail erneut senden</button>
+      </div>
+      <div class="g23f-update-banner" id="g23f-update-banner" hidden>
+        <span>Eine neue Version ist verfügbar.</span>
+        <button class="g23f-shell-btn primary" id="g23f-update-btn" type="button">Aktualisieren</button>
+      </div>
     </div>`);
 }
 
@@ -235,7 +237,7 @@ async function resetPassword() {
 async function sendVerification() {
   try {
     await sendEmailVerification(currentContext.user, { url: new URL(currentContext.rootPath, location.href).href });
-    toast("✓ Bestätigungsmail wurde gesendet");
+    toast("Bestätigungsmail gesendet. Sie kann etwas später eintreffen, prüfe auch den Spam-Ordner.");
   } catch (error) {
     toast(error?.code === "auth/too-many-requests" ? "Warte kurz, bevor du die Mail nochmals sendest." : "Die Mail konnte nicht gesendet werden.");
   }
@@ -450,6 +452,7 @@ async function handleAdminAction(event) {
 async function logout() {
   feedbackUnsubscribe?.();
   reportsUnsubscribe?.();
+  try { localStorage.removeItem("g23f-session-expected"); } catch {}
   await signOut(auth);
   location.href = currentContext.rootPath;
 }

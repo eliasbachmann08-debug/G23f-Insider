@@ -1,4 +1,4 @@
-const CACHE_NAME = "g23f-insider-v5-2026-08-10";
+const CACHE_NAME = "g23f-insider-v6-2026-08-17";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -48,14 +48,15 @@ self.addEventListener("fetch", event => {
   if (requestUrl.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
         if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
         }
         return response;
-      })
-      .catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
+      });
+    }).catch(() => caches.match("./index.html"))
   );
 });

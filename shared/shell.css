@@ -179,13 +179,18 @@
 .g23f-account-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g23f-shell-empty { padding: 1.5rem .8rem; border: 1px dashed var(--g23f-shell-border); border-radius: 11px; color: var(--g23f-shell-muted); text-align: center; font-size: .76rem; }
 
+.g23f-notification-stack {
+  position: fixed;
+  right: 1rem;
+  top: max(4.8rem, calc(env(safe-area-inset-top) + 4.8rem));
+  z-index: 1400;
+  width: min(410px, calc(100% - 2rem));
+  display: grid;
+  gap: .55rem;
+}
 .g23f-update-banner,
 .g23f-verify-banner {
-  position: fixed;
-  left: 50%;
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  z-index: 1400;
-  width: min(520px, calc(100% - 1.4rem));
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -196,10 +201,8 @@
   background: var(--g23f-shell-surface);
   color: var(--g23f-shell-text);
   box-shadow: 0 12px 40px rgba(31, 27, 23, .18);
-  transform: translateX(-50%);
   font: .72rem/1.4 Inter, system-ui, sans-serif;
 }
-.g23f-verify-banner { bottom: max(4.9rem, calc(env(safe-area-inset-bottom) + 4.9rem)); }
 .g23f-update-banner[hidden], .g23f-verify-banner[hidden] { display: none !important; }
 
 @media (max-width: 650px) {
@@ -208,4 +211,5 @@
   .g23f-profile-trigger .g23f-profile-name { display: none; }
   .g23f-profile-trigger { width: 40px; padding: .25rem; border-radius: 50%; }
   .g23f-shell-actions .g23f-shell-btn { flex: 1 1 145px; }
+  .g23f-notification-stack { right: .7rem; width: calc(100% - 1.4rem); }
 }

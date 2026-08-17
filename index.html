@@ -11,6 +11,12 @@
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="shared/firebase.js">
+  <link rel="modulepreload" href="shared/shell.js">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="shared/shell.css">
@@ -62,7 +68,7 @@
           <input id="register-password" type="password" minlength="6" autocomplete="new-password" placeholder="Mindestens 6 Zeichen" required>
           <label for="register-class-password">Klassenpasswort</label>
           <input id="register-class-password" type="password" autocomplete="off" placeholder="Klassenpasswort" required>
-          <p class="field-help">Du erhältst einmalig eine automatische Bestätigungsmail – keine Werbung und keine regelmässigen Mails.</p>
+          <p class="field-help">Die Bestätigungsmail kann etwas später eintreffen. Prüfe bei Bedarf auch den Spam-Ordner.</p>
           <p class="form-error" id="register-error" role="alert"></p>
           <button class="primary-btn" id="register-submit" type="submit">Konto erstellen →</button>
           <button class="text-btn" id="show-login-btn" type="button">Schon ein Konto? Anmelden</button>
@@ -94,6 +100,12 @@
         <p class="hero-sub">Interaktivi Lernapps, Zämefassige, dini private Notes ond üse gmeinsami Stondeplan.</p>
       </section>
 
+      <section class="feature-wrap primary-navigation page-width" aria-label="Hauptbereiche">
+        <a href="#faecher" class="feature-banner subjects-banner"><span class="feature-icon">🧠</span><span><small>Lernapps</small><strong>Fächer</strong><span>Lerninhalte ond Üebige nach Fach sortiert.</span></span><b>→</b></a>
+        <a href="stundenplan/" class="feature-banner timetable-banner"><span class="feature-icon">📅</span><span><small>Klasse</small><strong>Stundenplan</strong><span>Huusufgabe, Tests ond Termine, zäme iträge ond emmer aktuell.</span></span><b>→</b></a>
+        <a href="notes/" class="feature-banner notes-banner"><span class="feature-icon">🗒️</span><span><small>Privat</small><strong>G23f-Notes</strong><span>Eigeti Notize, Ordner ond Liste, nor för dech sechtbar.</span></span><b>→</b></a>
+      </section>
+
       <section class="dashboard-grid page-width" aria-label="Persönliche Übersicht">
         <article class="dashboard-card today-card">
           <div class="section-head"><div><p class="eyebrow">Übersicht</p><h2>Heute &amp; als Nächstes</h2></div><a href="stundenplan/">Alle →</a></div>
@@ -116,11 +128,6 @@
         </div>
         <div class="global-search" role="search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" autocomplete="off" aria-label="Stundenplan, Fächer und eigene Notes durchsuchen" placeholder="Stundenplan, Fächer und eigene Notes durchsuchen"><button id="clear-search" type="button" aria-label="Suche löschen">✕</button></div>
         <div class="finder-results" id="finder-results" hidden></div>
-      </section>
-
-      <section class="feature-wrap page-width">
-        <a href="stundenplan/" class="feature-banner timetable-banner"><span class="feature-icon">📅</span><span><small>Klasse</small><strong>Stundenplan</strong><span>Huusufgabe, Tests &amp; Organisatorischs, zäme iträge ond emmer aktuell.</span></span><b>→</b></a>
-        <a href="notes/" class="feature-banner notes-banner"><span class="feature-icon">🗒️</span><span><small>Privat</small><strong>G23f-Notes</strong><span>Eigeti Notize, Ordner ond Liste, nor för dech sechtbar.</span></span><b>→</b></a>
       </section>
 
       <section class="subjects page-width" id="faecher">
@@ -146,18 +153,32 @@
   <div class="install-popup" id="install-popup" hidden><button id="close-install" type="button">✕</button><strong>G23f-Insider installieren</strong><p id="install-help">Öffne das Browsermenü und wähle „App installieren“ oder „Zum Startbildschirm hinzufügen“.</p></div>
   <div class="welcome-modal" id="welcome-modal" hidden>
     <section class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
-      <div class="welcome-icon" aria-hidden="true">👋</div>
-      <p class="eyebrow">Willkomme</p>
+      <div class="onboarding-top">
+        <strong id="onboarding-progress">1/5</strong>
+        <button class="text-btn onboarding-skip" id="onboarding-skip-btn" type="button">Alles überspringen</button>
+      </div>
+      <div class="welcome-icon" id="onboarding-icon" aria-hidden="true">👋</div>
+      <p class="eyebrow" id="onboarding-kicker">Willkomme</p>
       <h2 id="welcome-title">Härzlech wellkomme bi G23f-Insider!</h2>
-      <p>Do gfendsch de allgemeini Stondeplan, chasch Schueltermin sälber iträge ond hesch dini private Termin ond Notes a eim Ort. So söll dis letschte Johr a dere Kanti öbersechtlecher ond stressfreier werde.</p>
-      <p class="welcome-note">Bestätige bitte no dini E-Mail-Adrässi i de automatisch versändete Mail.</p>
-      <p class="welcome-signoff">Danke ond vell Spass<br><strong>– Elias</strong></p>
-      <button class="primary-btn" id="welcome-close-btn" type="button">Los gaht’s →</button>
+      <p id="onboarding-copy">Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. D Bestätigungsmail cha chli später cho, lueg falls nötig au im Spam-Ordner.</p>
+      <div class="onboarding-dots" id="onboarding-dots" aria-hidden="true"></div>
+      <div class="onboarding-actions">
+        <button class="secondary-onboarding-btn" id="onboarding-back-btn" type="button" hidden>Zurück</button>
+        <button class="primary-btn" id="onboarding-next-btn" type="button">Weiter →</button>
+      </div>
     </section>
   </div>
   <div class="page-toast" id="page-toast" role="status" aria-live="polite"></div>
-  <div class="loading-layer" id="loading-layer"><div class="spinner"></div><span id="loading-text">Anmeldung wird geprüft …</span></div>
+  <div class="loading-layer" id="loading-layer" hidden><div class="spinner"></div><span id="loading-text">Anmeldung wird geprüft …</span></div>
 
+  <script>
+    try {
+      if (localStorage.getItem("g23f-session-expected") === "1") {
+        document.getElementById("auth-gate").hidden = true;
+        document.getElementById("loading-layer").hidden = false;
+      }
+    } catch {}
+  </script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

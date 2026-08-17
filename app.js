@@ -29,9 +29,33 @@ let deferredPrompt = null;
 let visitRecorded = false;
 let visitThreshold;
 let welcomeReturnTarget = null;
+let onboardingStep = 0;
 const entrySources = new Map();
 const entryReady = new Set();
 const unsubscribers = [];
+const ONBOARDING_VERSION = "v2";
+const ONBOARDING_STEPS = [
+  {
+    icon: "👋", kicker: "Willkomme", title: "Härzlech wellkomme bi G23f-Insider!",
+    copy: "Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. D Bestätigungsmail cha chli später cho, lueg falls nötig au im Spam-Ordner."
+  },
+  {
+    icon: "🧭", kicker: "Direkt loslege", title: "Drei wichtige Bereiche",
+    copy: "Die drei leicht dunkleren Felder führen dich direkt zu den Lernapps, zum Stundenplan und zu deinen privaten G23f-Notes."
+  },
+  {
+    icon: "📌", kicker: "Deine Übersicht", title: "Was steht an?",
+    copy: "«Heute & als Nächstes» zeigt kommende Einträge. «Neu oder geändert» zeigt nur Termine, die seit deinem letzten Besuch neu sind oder angepasst wurden."
+  },
+  {
+    icon: "🔎", kicker: "Schnell finden", title: "Schnellfinder und Suche",
+    copy: "Mit Heute, Diese Woche und Nächster Test findest du Wichtiges sofort. Die Suche prüft Stundenplan, Lernapps und deine eigenen Notes."
+  },
+  {
+    icon: "✨", kicker: "Gut zu wissen", title: "Profil, Download und Erstellen",
+    copy: "Oben öffnest du dein Profil und lädst die App herunter. Mit + erstellst du etwas Neues. Ganz unten kannst du Fehler oder Ideen direkt an Elias melden."
+  }
+];
 
 function cleanName(value) {
   return String(value || "").normalize("NFC").trim().replace(/\s+/g, " ");
@@ -119,19 +143,57 @@ function toast(message) {
   toastTimer = setTimeout(() => $("page-toast").classList.remove("show"), 3200);
 }
 
+function onboardingStorageKey(user = currentUser) {
+  return user ? `g23f-onboarding-${ONBOARDING_VERSION}-${user.uid}` : null;
+}
+
+function onboardingIsDone(user = currentUser) {
+  const key = onboardingStorageKey(user);
+  if (!key) return true;
+  try { return localStorage.getItem(key) === "done"; } catch { return false; }
+}
+
+function renderOnboarding() {
+  const step = ONBOARDING_STEPS[onboardingStep];
+  $("onboarding-progress").textContent = `${onboardingStep + 1}/${ONBOARDING_STEPS.length}`;
+  $("onboarding-icon").textContent = step.icon;
+  $("onboarding-kicker").textContent = step.kicker;
+  $("welcome-title").textContent = step.title;
+  $("onboarding-copy").textContent = step.copy;
+  $("onboarding-back-btn").hidden = onboardingStep === 0;
+  $("onboarding-next-btn").textContent = onboardingStep === ONBOARDING_STEPS.length - 1 ? "Los geht’s →" : "Weiter →";
+  $("onboarding-dots").innerHTML = ONBOARDING_STEPS.map((_, index) => `<span class="${index === onboardingStep ? "active" : ""}"></span>`).join("");
+}
+
 function openWelcome(returnTarget = null) {
   welcomeReturnTarget = returnTarget;
+  onboardingStep = 0;
+  renderOnboarding();
   $("welcome-modal").hidden = false;
   document.body.classList.add("welcome-open");
-  setTimeout(() => $("welcome-close-btn").focus(), 30);
+  setTimeout(() => $("onboarding-next-btn").focus(), 30);
 }
 
 function closeWelcome() {
+  const key = onboardingStorageKey();
+  if (key) { try { localStorage.setItem(key, "done"); } catch {} }
   $("welcome-modal").hidden = true;
   document.body.classList.remove("welcome-open");
   const target = welcomeReturnTarget;
   welcomeReturnTarget = null;
   if (target) location.replace(target);
+}
+
+function nextOnboardingStep() {
+  if (onboardingStep >= ONBOARDING_STEPS.length - 1) return closeWelcome();
+  onboardingStep += 1;
+  renderOnboarding();
+}
+
+function previousOnboardingStep() {
+  if (onboardingStep === 0) return;
+  onboardingStep -= 1;
+  renderOnboarding();
 }
 
 function authMessage(error) {
@@ -164,6 +226,7 @@ function showAuth(mode = "login", message = "") {
 }
 
 function showApp() {
+  try { localStorage.setItem("g23f-session-expected", "1"); } catch {}
   $("auth-gate").hidden = true;
   $("app-content").hidden = false;
   $("main-nav").hidden = false;
@@ -224,8 +287,14 @@ async function ensureAdminProfile(user) {
   const handleRef = doc(db, COLLECTIONS.handles, "elias");
   const [profileSnapshot, handleSnapshot] = await Promise.all([getDoc(profileRef), getDoc(handleRef)]);
   const existing = profileSnapshot.exists() ? profileSnapshot.data() : {};
-  await setDoc(profileRef, { nickname: "Elias", nicknameKey: "elias", photoData: existing.photoData || null, createdAt: existing.createdAt || serverTimestamp() });
-  await setDoc(handleRef, { uid: user.uid, nickname: "Elias", nicknameKey: "elias", createdAt: handleSnapshot.exists() ? (handleSnapshot.data().createdAt || serverTimestamp()) : serverTimestamp() });
+  const writes = [];
+  if (!profileSnapshot.exists() || existing.nickname !== "Elias" || existing.nicknameKey !== "elias") {
+    writes.push(setDoc(profileRef, { nickname: "Elias", nicknameKey: "elias", photoData: existing.photoData || null, createdAt: existing.createdAt || serverTimestamp() }));
+  }
+  if (!handleSnapshot.exists() || handleSnapshot.data().uid !== user.uid) {
+    writes.push(setDoc(handleRef, { uid: user.uid, nickname: "Elias", nicknameKey: "elias", createdAt: handleSnapshot.exists() ? (handleSnapshot.data().createdAt || serverTimestamp()) : serverTimestamp() }));
+  }
+  if (writes.length) await Promise.all(writes);
   return { uid: user.uid, nickname: "Elias", nicknameKey: "elias", photoData: existing.photoData || null, createdAt: existing.createdAt || null };
 }
 
@@ -246,12 +315,16 @@ async function loadSession(user, { welcome = false } = {}) {
   showLoading("Klassenkonto wird geladen …");
   try {
     let member = null;
+    let profileSnapshot = null;
     if (!isAdminUser(user)) {
-      const memberSnapshot = await getDoc(doc(db, COLLECTIONS.members, user.uid));
+      const [memberSnapshot, loadedProfileSnapshot] = await Promise.all([
+        getDoc(doc(db, COLLECTIONS.members, user.uid)),
+        getDoc(doc(db, COLLECTIONS.users, user.uid))
+      ]);
+      profileSnapshot = loadedProfileSnapshot;
       if (!memberSnapshot.exists()) {
         let oldName = "";
-        const oldProfile = await getDoc(doc(db, COLLECTIONS.users, user.uid)).catch(() => null);
-        if (oldProfile?.exists()) oldName = oldProfile.data().nickname || "";
+        if (profileSnapshot.exists()) oldName = profileSnapshot.data().nickname || "";
         $("join-name").value = oldName;
         showAuth("join");
         return;
@@ -266,11 +339,11 @@ async function loadSession(user, { welcome = false } = {}) {
     if (run !== sessionRun) return;
     if (isAdminUser(user)) currentProfile = await ensureAdminProfile(user);
     else {
-      const profileSnapshot = await getDoc(doc(db, COLLECTIONS.users, user.uid));
       currentProfile = profileSnapshot.exists() ? { uid: user.uid, ...profileSnapshot.data() } : { uid: user.uid, nickname: member.nickname, nicknameKey: member.nicknameKey, photoData: null };
     }
     const returnTarget = safeReturnTarget();
-    if (returnTarget && !welcome) {
+    const showOnboarding = welcome || !onboardingIsDone(user);
+    if (returnTarget && !showOnboarding) {
       location.replace(returnTarget);
       return;
     }
@@ -279,9 +352,10 @@ async function loadSession(user, { welcome = false } = {}) {
       shellMounted = true;
     }
     showApp();
-    await loadSubjects();
     startDataListeners();
-    if (welcome) openWelcome(returnTarget);
+    hideLoading();
+    loadSubjects();
+    if (showOnboarding) requestAnimationFrame(() => openWelcome(returnTarget));
   } catch (error) {
     console.error(error);
     showAuth("login", "Das Konto konnte nicht geladen werden. Prüfe die Firebase-Regeln oder melde dich bei Elias.");
@@ -324,8 +398,8 @@ async function handleRegistration(event) {
     await closeRegistrationTicket(ticket.ticketId);
     try {
       await sendEmailVerification(credential.user, { url: new URL("./", location.href).href });
-      toast("✓ Konto erstellt – Bestätigungsmail wurde gesendet");
-    } catch { toast("✓ Konto erstellt. Die Bestätigungsmail kann im Profil nochmals gesendet werden."); }
+      toast("Konto erstellt, Bestätigungsmail gesendet. Prüfe bei Bedarf auch den Spam-Ordner.");
+    } catch { toast("Konto erstellt. Die Bestätigungsmail kann im Profil nochmals gesendet werden."); }
     $("register-class-password").value = "";
     await loadSession(credential.user, { welcome: true });
   } catch (error) {
@@ -522,7 +596,9 @@ $("global-search").addEventListener("input", renderFinderSearch);
 $("clear-search").addEventListener("click", () => { $("global-search").value = ""; renderFinderSearch(); $("global-search").focus(); });
 document.querySelectorAll("[data-finder]").forEach(button => button.addEventListener("click", () => finderPreset(button.dataset.finder)));
 $("quick-create-btn").addEventListener("click", event => { event.stopPropagation(); $("quick-menu").hidden = !$("quick-menu").hidden; });
-$("welcome-close-btn").addEventListener("click", closeWelcome);
+$("onboarding-next-btn").addEventListener("click", nextOnboardingStep);
+$("onboarding-back-btn").addEventListener("click", previousOnboardingStep);
+$("onboarding-skip-btn").addEventListener("click", closeWelcome);
 document.addEventListener("click", event => { if (!event.target.closest("#quick-menu")) $("quick-menu").hidden = true; });
 setupInstall();
 
@@ -531,6 +607,7 @@ onAuthStateChanged(auth, user => {
   if (authBusy) return;
   if (user) loadSession(user);
   else {
+    try { localStorage.removeItem("g23f-session-expected"); } catch {}
     currentUser = null; currentProfile = null; shellMounted = false; sessionRun += 1;
     const params = new URLSearchParams(location.search);
     const message = params.get("error") === "blocked" ? "Dieses Konto wurde gesperrt. Melde dich bei Elias." : "";

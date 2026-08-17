@@ -180,6 +180,12 @@ function entryTitle(entry) {
   return entry.type === "organisatorisch" ? (entry.thema || "Organisatorisches") : (entry.fach || "Ohne Fach");
 }
 
+function calendarPreviewTitle(entry) {
+  const title = entryTitle(entry);
+  const detail = entry.type === "organisatorisch" ? "" : String(entry.thema || "").trim();
+  return detail ? `${title}: ${detail}` : title;
+}
+
 function profileFor(uid) {
   return allUsers.find(user => user.uid === uid) || (uid === currentUser?.uid ? currentProfile : null);
 }
@@ -636,7 +642,7 @@ function compactEntryHTML(entry, className = "calendar-entry") {
   const completed = entry.type === "hausaufgabe" && completedEntryIds.has(entry.id);
   const label = className === "agenda-entry"
     ? `<span class="entry-main"><span class="entry-label">${completed ? "✓ " : ""}${escapeHTML(entryTitle(entry))}</span><span class="entry-tap-hint">Antippen für genauere Infos</span></span>`
-    : `<span class="entry-label">${escapeHTML(entryTitle(entry))}</span>`;
+    : `<span class="entry-label">${escapeHTML(calendarPreviewTitle(entry))}</span>`;
   return `<button class="${className} ${escapeHTML(entry.type)} ${completed ? "completed" : ""}" type="button" data-entry-id="${safeId(entry.id)}">
     <span class="entry-kind">${escapeHTML(typeKind(entry))}</span>
     ${label}
@@ -664,10 +670,12 @@ function renderWeek() {
   const mobile = days.map((day, index) => {
     const dayEntries = entriesForDate(day);
     const classes = ["strip-day", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : "", index === 6 ? "sunday" : ""].filter(Boolean).join(" ");
+    const previews = dayEntries.slice(0, 2).map(entry => `<span class="strip-event ${escapeHTML(entry.type)}">${escapeHTML(calendarPreviewTitle(entry))}</span>`).join("");
+    const more = dayEntries.length > 2 ? `<span class="strip-more">+${dayEntries.length - 2}</span>` : "";
     return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
       <span class="strip-weekday">${["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index]}</span>
       <span class="strip-number">${day.getDate()}</span>
-      ${eventBars(dayEntries, 4)}
+      <span class="strip-events">${previews}${more}</span>
     </button>`;
   }).join("");
 
@@ -686,7 +694,7 @@ function renderMonth() {
     const dayEntries = entriesForDate(day);
     const outside = day.getMonth() !== selectedDate.getMonth();
     const classes = ["month-day", outside ? "outside" : "", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
-    const labels = dayEntries.slice(0, 3).map(entry => `<span class="month-event ${escapeHTML(entry.type)}">${escapeHTML(entryTitle(entry))}</span>`).join("");
+    const labels = dayEntries.slice(0, 3).map(entry => `<span class="month-event ${escapeHTML(entry.type)}">${escapeHTML(calendarPreviewTitle(entry))}</span>`).join("");
     const more = dayEntries.length > 3 ? `<span class="month-more">+${dayEntries.length - 3}</span>` : "";
     return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
       <span class="month-number">${day.getDate()}</span>
@@ -723,7 +731,7 @@ function renderCalendar(animate = false) {
   if (currentView === "week") {
     const monday = startOfWeek(selectedDate);
     const sunday = addDays(monday, 6);
-    $("period-label").textContent = `KW ${swissWeekNumber(monday)} · ${shortDate(monday)}–${shortDate(sunday)}`;
+    $("period-label").textContent = `KW ${swissWeekNumber(monday)}, ${shortDate(monday)} bis ${shortDate(sunday)}`;
     $("calendar-surface").innerHTML = renderWeek();
   } else {
     $("period-label").textContent = selectedDate.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
@@ -781,7 +789,7 @@ function searchResultHTML(entry, isPast) {
   const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
   const secondary = entry.type === "organisatorisch" ? entry.infos : entry.thema;
   const dateLabel = entry.dateTo && entry.dateTo !== entry.date
-    ? `${shortDate(parseDate(entry.date))} – ${shortDate(parseDate(entry.dateTo))}`
+    ? `${shortDate(parseDate(entry.date))} bis ${shortDate(parseDate(entry.dateTo))}`
     : longDate(parseDate(entry.date));
   return `<button class="search-result ${isPast ? "past" : ""}" type="button" data-search-entry-id="${safeId(entry.id)}">
     <span class="search-result-kind ${escapeHTML(entry.type)}">${escapeHTML(meta.icon)} ${escapeHTML(meta.short)}</span>
@@ -869,7 +877,7 @@ function setEntryType(type) {
   $("range-date-row").hidden = !organisational;
   $("subject-row").hidden = organisational;
   $("entry-topic-label").textContent = organisational ? "Ereignis" : "Auftrag / Thema";
-  $("entry-topic").placeholder = organisational ? "z. B. Sporttag oder Herbstferien" : "z. B. Seiten 45–52 lesen";
+  $("entry-topic").placeholder = organisational ? "z. B. Sporttag oder Herbstferien" : "z. B. Seiten 45 bis 52 lesen";
 }
 
 function setEntryVisibility(visibility) {
@@ -1068,7 +1076,7 @@ async function saveEntry(event) {
         editedAt: null
       });
       const visibilityText = selectedVisibility === "alle" ? "alle sehen ihn" : selectedVisibility === "privat" ? "nur du siehst ihn" : `sichtbar für ${visibleToNames.join(", ")}`;
-      toast(`✓ Gespeichert – ${visibilityText}`);
+      toast(`✓ Gespeichert, ${visibilityText}`);
     }
     closeModal("entry-modal");
   } catch (error) {
@@ -1146,7 +1154,7 @@ function exportEntryToCalendar(entry) {
 function createNoteFromEntry(entry) {
   const params = new URLSearchParams({
     new: "1",
-    title: `${entryTitle(entry)} – ${shortDate(parseDate(entry.date))}`,
+    title: `${entryTitle(entry)}, ${shortDate(parseDate(entry.date))}`,
     body: [entry.thema, entry.infos, safeLink(entry.linkUrl)].filter(Boolean).join("\n\n"),
     fromEntry: entry.id
   });
@@ -1177,7 +1185,7 @@ function openEntryDetail(entryId) {
   const author = profileFor(entry.authorUid) || { uid: entry.authorUid, nickname: entry.authorName || "Unbekannt", photoData: null };
   const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
   const dateLabel = entry.dateTo && entry.dateTo !== entry.date
-    ? `${longDate(parseDate(entry.date))} – ${longDate(parseDate(entry.dateTo))}`
+    ? `${longDate(parseDate(entry.date))} bis ${longDate(parseDate(entry.dateTo))}`
     : longDate(parseDate(entry.date));
   const canManage = canManageEntry(entry);
   const canReport = entry.authorUid !== currentUser.uid;
@@ -1498,7 +1506,7 @@ async function handleRegistration(event) {
     await closeRegistrationTicket(ticket.ticketId);
     $("register-class-password").value = "";
     await loadSession(credential.user);
-    toast("✓ Konto erstellt – willkommen!");
+    toast("✓ Konto erstellt, willkommen!");
   } catch (error) {
     console.error(error);
     await closeRegistrationTicket(ticket?.ticketId);

@@ -551,7 +551,7 @@ async function removeFolder(folderId) {
     batch.delete(doc(db, "noteFolders", currentUser.uid, "folders", folderId));
     await batch.commit();
     if (activeFilter.type === "folder" && activeFilter.id === folderId) activeFilter = { type: "all", id: null };
-    toast("Ordner gelöscht – Notizen bleiben erhalten");
+    toast("Ordner gelöscht, Notizen bleiben erhalten");
   } catch {
     toast("⚠️ Der Ordner konnte nicht gelöscht werden");
   } finally {
