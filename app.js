@@ -9,6 +9,13 @@ import {
 import { auth, authReady, db, isAdminUser } from "./shared/firebase.js";
 import { mountGlobalShell } from "./shared/shell.js";
 
+const legacySubjects = document.getElementById("faecher");
+if (legacySubjects?.classList.contains("subjects")) {
+  const legacyNotice = legacySubjects.nextElementSibling;
+  legacySubjects.remove();
+  if (legacyNotice?.classList.contains("disclaimer")) legacyNotice.remove();
+}
+
 const $ = id => document.getElementById(id);
 const COLLECTIONS = { entries: "eintraege", users: "users", members: "members", handles: "handles", tickets: "registrationTickets", blocks: "accountBlocks" };
 const TYPE_META = {
@@ -36,11 +43,11 @@ const ONBOARDING_VERSION = "v2";
 const ONBOARDING_STEPS = [
   {
     icon: "👋", kicker: "Willkomme", title: "Härzlech wellkomme bi G23f-Insider!",
-    copy: "Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. Wichtig, d Bestätigungsmail landet hüfig im Spam-Ordner."
+    copy: "Do hesch de Stondeplan, Lernapps, dini private Notes ond d Planung vo de Maturareis a eim Ort. Wichtig, d Bestätigungsmail landet hüfig im Spam-Ordner."
   },
   {
-    icon: "🧭", kicker: "Direkt loslege", title: "Drei wichtige Bereiche",
-    copy: "Die drei leicht dunkleren Felder führen dich direkt zu den Lernapps, zum Stundenplan und zu deinen privaten G23f-Notes."
+    icon: "🧭", kicker: "Direkt loslege", title: "Vier wichtige Bereiche",
+    copy: "Die leicht dunkleren Felder führen dich direkt zu den Lernapps, zum Stundenplan, zu deinen privaten G23f-Notes und zur gemeinsamen Maturareise-Planung."
   },
   {
     icon: "📌", kicker: "Deine Übersicht", title: "Was steht an?",
@@ -52,7 +59,7 @@ const ONBOARDING_STEPS = [
   },
   {
     icon: "✨", kicker: "Gut zu wissen", title: "Profil, Download und Erstellen",
-    copy: "Oben öffnest du dein Profil und lädst die App herunter. Mit + erstellst du etwas Neues. Ganz unten kannst du Fehler oder Ideen direkt an Elias melden."
+    copy: "Oben findest du dein Profil, den App-Download und die Glocke für offene Benachrichtigungen. Mit + erstellst du etwas Neues. Ganz unten kannst du Fehler oder Ideen direkt an Elias melden."
   }
 ];
 
@@ -402,8 +409,11 @@ async function handleRegistration(event) {
     await closeRegistrationTicket(ticket.ticketId);
     try {
       await sendEmailVerification(credential.user, { url: new URL("./", location.href).href });
-      toast("Konto erstellt. Wichtig, prüfe für die Bestätigungsmail direkt auch den Spam-Ordner.");
-    } catch { toast("Konto erstellt. Die Bestätigungsmail kann im Profil nochmals gesendet werden."); }
+      toast("Konto erstellt. Firebase hat den Mailversand direkt angenommen. Prüfe auch den Spam-Ordner.");
+    } catch (verificationError) {
+      console.warn("verification-mail", verificationError?.code || verificationError);
+      toast("Konto erstellt. Der Mailversand ist fehlgeschlagen. Sende die Mail bei der Glocke nochmals.");
+    }
     $("register-class-password").value = "";
     await loadSession(credential.user, { welcome: true });
   } catch (error) {
@@ -429,7 +439,13 @@ async function handleJoin(event) {
     ticket = await createRegistrationTicket(currentUser, nickname, classPassword);
     await finishRegistration(currentUser, nickname, ticket.ticketId, ticket.nicknameKey);
     await closeRegistrationTicket(ticket.ticketId);
-    if (!currentUser.emailVerified) { try { await sendEmailVerification(currentUser, { url: new URL("./", location.href).href }); } catch {} }
+    if (!currentUser.emailVerified) {
+      try {
+        await sendEmailVerification(currentUser, { url: new URL("./", location.href).href });
+      } catch (verificationError) {
+        console.warn("verification-mail", verificationError?.code || verificationError);
+      }
+    }
     $("join-class-password").value = "";
     await loadSession(currentUser);
     toast("✓ Konto freigeschaltet");

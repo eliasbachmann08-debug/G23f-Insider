@@ -1,4 +1,4 @@
-const CACHE_NAME = "g23f-insider-v7-2026-08-21";
+const CACHE_NAME = "g23f-insider-v8-2026-08-21";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -21,6 +21,9 @@ const APP_SHELL = [
   "./faecher/styles.css",
   "./faecher/app.js",
   "./faecher/faecher.json",
+  "./maturareise/index.html",
+  "./maturareise/styles.css",
+  "./maturareise/app.js",
   "./faecher/biologie/index.html",
   "./faecher/biologie/app.js",
   "./faecher/biologie/themen.json"
@@ -49,6 +52,19 @@ self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(async () => (await caches.match(event.request)) || caches.match("./index.html"))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(cached => {

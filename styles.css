@@ -19,6 +19,12 @@ body.welcome-open{overflow:hidden}
 @media(max-width:760px){.site-header{grid-template-columns:auto 1fr auto;padding-left:.8rem;padding-right:.8rem}.main-nav{display:none!important}.header-tools{gap:.3rem}.install-btn span{display:none}.hero{padding-top:2.6rem}.primary-navigation{grid-template-columns:1fr}.dashboard-grid{grid-template-columns:1fr}.finder-head{align-items:flex-start;flex-direction:column}.finder-chips{justify-content:flex-start}.feature-banner span span{display:none}.page-width,.hero{width:min(100% - 1.4rem,1100px)}.subject-grid{grid-template-columns:1fr 1fr}.quick-create{right:.85rem}.install-popup,.page-toast{right:.7rem;top:max(4.4rem,calc(env(safe-area-inset-top) + 4.4rem));max-width:calc(100% - 1.4rem)}}
 @media(max-width:430px){.subject-grid{grid-template-columns:1fr}.compact-date{display:none}.feature-banner{padding:1.05rem}.hero-deco{display:none}}
 
+.primary-navigation{grid-template-columns:repeat(4,minmax(0,1fr))}
+.trip-banner{--feature:#a46648}
+@media(max-width:1080px){.primary-navigation{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.primary-navigation{grid-template-columns:1fr}}
+#faecher.subjects,#faecher.subjects+.disclaimer{display:none!important}
+
 .register-callout {
   display: grid;
   gap: .45rem;

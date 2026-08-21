@@ -1,6 +1,6 @@
 import {
   collection, addDoc, deleteDoc, doc, getDocs, onSnapshot, query,
-  serverTimestamp, setDoc, updateDoc, where
+  serverTimestamp, setDoc, updateDoc, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   sendEmailVerification, sendPasswordResetEmail, signOut
@@ -12,15 +12,22 @@ const CATEGORY_LABELS = {
   fehler: "Fehler", idee: "Verbesserungsidee", inhalt: "Falscher Inhalt",
   name: "Namenskorrektur", konto: "Konto / Daten", sonstiges: "Sonstiges"
 };
+const EMAIL_NOTIFICATION_ID = "email-verification";
 
 let currentContext = null;
 let feedbackUnsubscribe = null;
 let reportsUnsubscribe = null;
 let accountBlockUnsubscribe = null;
+let notificationAllUnsubscribe = null;
+let notificationSpecificUnsubscribe = null;
+let notificationStateUnsubscribe = null;
 let ownFeedback = [];
 let adminFeedback = [];
 let adminReports = [];
 let adminAccounts = [];
+let notificationSources = { all: [], specific: [] };
+let notificationStates = new Map();
+let notificationSelectedUids = new Set();
 let adminTab = "feedback";
 let toastTimer = null;
 
@@ -119,6 +126,42 @@ function injectShell() {
         <div class="g23f-status-list" id="g23f-own-feedback"></div>
       </section>
     </div>
+    <div class="g23f-shell-modal" id="g23f-notifications-modal" hidden>
+      <section class="g23f-shell-panel wide" role="dialog" aria-modal="true" aria-labelledby="g23f-notifications-title">
+        <button class="g23f-shell-close" type="button" data-g23f-close="g23f-notifications-modal" aria-label="Schliessen">✕</button>
+        <div class="g23f-notification-heading">
+          <div>
+            <p class="g23f-shell-kicker">Dein Bereich</p>
+            <h2 id="g23f-notifications-title">Benachrichtigungen</h2>
+            <p class="g23f-shell-muted">Die Zahl bei der Glocke zeigt deine unerledigten Benachrichtigungen.</p>
+          </div>
+          <button class="g23f-shell-btn primary" id="g23f-new-notification" type="button" hidden>＋ Erstellen</button>
+        </div>
+        <form class="g23f-shell-form g23f-notification-form" id="g23f-notification-form" hidden>
+          <h3>Neue Benachrichtigung</h3>
+          <label for="g23f-notification-title">Titel</label>
+          <input id="g23f-notification-title" type="text" maxlength="100" placeholder="Kurzer Titel" required>
+          <label for="g23f-notification-message">Nachricht</label>
+          <textarea id="g23f-notification-message" rows="4" maxlength="800" placeholder="Was sollen die Empfänger wissen?" required></textarea>
+          <label for="g23f-notification-target">Empfänger</label>
+          <select id="g23f-notification-target">
+            <option value="all">Alle</option>
+            <option value="specific">Bestimmte Personen</option>
+          </select>
+          <div class="g23f-notification-people-wrap" id="g23f-notification-people-wrap" hidden>
+            <label for="g23f-notification-people-search">Personen suchen</label>
+            <input id="g23f-notification-people-search" type="search" autocomplete="off" placeholder="Vorname">
+            <div class="g23f-notification-people" id="g23f-notification-people"></div>
+          </div>
+          <p class="g23f-shell-error" id="g23f-notification-error"></p>
+          <div class="g23f-shell-actions">
+            <button class="g23f-shell-btn primary" id="g23f-notification-submit" type="submit">Senden</button>
+            <button class="g23f-shell-btn" id="g23f-notification-cancel" type="button">Abbrechen</button>
+          </div>
+        </form>
+        <div class="g23f-notification-list" id="g23f-notification-list"></div>
+      </section>
+    </div>
     <div class="g23f-shell-modal" id="g23f-admin-modal" hidden>
       <section class="g23f-shell-panel wide" role="dialog" aria-modal="true" aria-labelledby="g23f-admin-title">
         <button class="g23f-shell-close" type="button" data-g23f-close="g23f-admin-modal" aria-label="Schliessen">✕</button>
@@ -133,17 +176,6 @@ function injectShell() {
       </section>
     </div>
     <div class="g23f-notification-stack">
-      <div class="g23f-verify-banner" id="g23f-verify-banner" hidden>
-        <div class="g23f-verify-copy">
-          <strong>⚠️ E-Mail noch bestätigen</strong>
-          <span><b>Wichtig:</b> Die Bestätigungsmail landet häufig im Spam-Ordner. Prüfe ihn direkt, falls die Mail fehlt.</span>
-          <small>Nach oben wischen oder den Pfeil antippen, um den Hinweis auszublenden.</small>
-        </div>
-        <div class="g23f-verify-actions">
-          <button class="g23f-shell-btn" id="g23f-resend-verification" type="button">Mail erneut senden</button>
-          <button class="g23f-verify-dismiss" id="g23f-dismiss-verification" type="button" aria-label="Hinweis bis zum nächsten Seitenaufruf ausblenden">↑</button>
-        </div>
-      </div>
       <div class="g23f-update-banner" id="g23f-update-banner" hidden>
         <span>Eine neue Version ist verfügbar.</span>
         <button class="g23f-shell-btn primary" id="g23f-update-btn" type="button">Aktualisieren</button>
@@ -190,6 +222,265 @@ function updateProfileTriggers() {
     button.classList.add("g23f-admin-trigger");
     button.hidden = !currentContext.admin;
   });
+  document.querySelectorAll("[data-g23f-notifications]").forEach(button => {
+    button.classList.add("g23f-notification-trigger");
+    button.hidden = false;
+  });
+  const createButton = document.getElementById("g23f-new-notification");
+  if (createButton) createButton.hidden = !currentContext.admin;
+}
+
+function ensureNotificationTriggers() {
+  document.querySelectorAll("[data-g23f-profile]").forEach(profileButton => {
+    const parent = profileButton.parentElement;
+    if (!parent || parent.querySelector("[data-g23f-notifications]")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.g23fNotifications = "";
+    button.setAttribute("aria-label", "Benachrichtigungen öffnen");
+    button.innerHTML = '<span aria-hidden="true">🔔</span>';
+    const adminButton = parent.querySelector("[data-g23f-admin]");
+    parent.insertBefore(button, adminButton || profileButton);
+  });
+}
+
+function mergedNotifications() {
+  const merged = new Map();
+  [...notificationSources.all, ...notificationSources.specific].forEach(item => merged.set(item.id, item));
+  return [...merged.values()];
+}
+
+function notificationCompleted(item) {
+  if (item.id === EMAIL_NOTIFICATION_ID) return Boolean(currentContext?.user?.emailVerified);
+  return Boolean(notificationStates.get(item.id)?.completed);
+}
+
+function visibleNotifications() {
+  const values = mergedNotifications()
+    .filter(item => !notificationStates.get(item.id)?.deleted)
+    .map(item => ({ ...item, completed: notificationCompleted(item) }));
+
+  const emailState = notificationStates.get(EMAIL_NOTIFICATION_ID);
+  if (currentContext?.user?.email && !(currentContext.user.emailVerified && emailState?.deleted)) {
+    values.push({
+      id: EMAIL_NOTIFICATION_ID,
+      title: currentContext.user.emailVerified ? "E-Mail bestätigt" : "E-Mail noch bestätigen",
+      message: currentContext.user.emailVerified
+        ? "Deine E-Mail-Adresse wurde bestätigt. Diese Aufgabe ist automatisch erledigt."
+        : `Die Mail wird an ${currentContext.user.email} geschickt. Öffne darin den Bestätigungslink. WICHTIG, prüfe direkt den SPAM-ORDNER, die Mail landet häufig dort.`,
+      kind: "automatic",
+      sourceType: "email",
+      createdAt: null,
+      completed: Boolean(currentContext.user.emailVerified),
+      emailTask: true
+    });
+  }
+
+  return values.sort((a, b) => Number(a.completed) - Number(b.completed) ||
+    (timestampDate(b.createdAt)?.getTime() || 0) - (timestampDate(a.createdAt)?.getTime() || 0));
+}
+
+function updateNotificationCount() {
+  if (!currentContext) return;
+  const count = visibleNotifications().filter(item => !item.completed).length;
+  document.querySelectorAll("[data-g23f-notifications]").forEach(button => {
+    let badge = button.querySelector(".g23f-shell-count");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "g23f-shell-count";
+      button.append(badge);
+    }
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.hidden = count === 0;
+    button.setAttribute("aria-label", count === 1
+      ? "Benachrichtigungen öffnen, 1 unerledigt"
+      : `Benachrichtigungen öffnen, ${count} unerledigt`);
+  });
+}
+
+function notificationTypeLabel(item) {
+  if (item.sourceType === "email") return "E-Mail-Bestätigung";
+  if (item.sourceType === "feedback") return "Feedback";
+  if (item.sourceType === "report") return "Meldung";
+  return item.kind === "automatic" ? "Automatisch" : "Mitteilung von Elias";
+}
+
+function renderNotifications() {
+  const container = document.getElementById("g23f-notification-list");
+  if (!container || !currentContext) return;
+  const list = visibleNotifications();
+  container.innerHTML = list.length ? list.map(item => {
+    const completed = Boolean(item.completed);
+    const id = encodeId(item.id);
+    const actions = item.emailTask
+      ? (completed
+          ? `<button class="g23f-shell-btn danger" type="button" data-delete-notification="${id}">Löschen</button>`
+          : '<button class="g23f-shell-btn primary" type="button" data-resend-verification>Mail erneut senden</button><button class="g23f-shell-btn" type="button" data-check-verification>Status prüfen</button>')
+      : `${completed ? "" : `<button class="g23f-shell-btn primary" type="button" data-complete-notification="${id}">Als erledigt markieren</button>`}<button class="g23f-shell-btn danger" type="button" data-delete-notification="${id}">Löschen</button>`;
+    return `<article class="g23f-notification-card ${completed ? "completed" : ""}">
+      <div class="g23f-card-head">
+        <div><span class="g23f-notification-type">${escapeHTML(notificationTypeLabel(item))}</span><h3>${escapeHTML(item.title)}</h3></div>
+        <span class="g23f-status-pill ${completed ? "done" : "review"}">${completed ? "Erledigt" : "Offen"}</span>
+      </div>
+      <p>${escapeHTML(item.message)}</p>
+      ${item.createdAt ? `<p class="g23f-notification-date">${escapeHTML(formatDate(item.createdAt))}</p>` : ""}
+      <div class="g23f-shell-actions">${actions}</div>
+    </article>`;
+  }).join("") : '<div class="g23f-shell-empty">Keine Benachrichtigungen.</div>';
+  updateNotificationCount();
+}
+
+async function refreshEmailVerification(showResult = false) {
+  if (!currentContext?.user?.email) return;
+  try {
+    await currentContext.user.reload();
+    currentContext.user = auth.currentUser || currentContext.user;
+    if (currentContext.user.emailVerified) await currentContext.user.getIdToken(true);
+    renderProfile();
+    renderNotifications();
+    if (showResult) toast(currentContext.user.emailVerified ? "✓ E-Mail ist bestätigt" : "Die E-Mail ist noch nicht bestätigt. Prüfe auch den Spam-Ordner.");
+  } catch {
+    if (showResult) toast("Der Status konnte gerade nicht geprüft werden.");
+  }
+}
+
+async function setNotificationState(notificationId, deleted) {
+  await setDoc(doc(db, "notificationStates", currentContext.user.uid, "items", notificationId), {
+    notificationId,
+    completed: true,
+    deleted,
+    updatedAt: serverTimestamp()
+  });
+}
+
+async function handleNotificationAction(event) {
+  const completeButton = event.target.closest("[data-complete-notification]");
+  const deleteButton = event.target.closest("[data-delete-notification]");
+  const resendButton = event.target.closest("[data-resend-verification]");
+  const checkButton = event.target.closest("[data-check-verification]");
+  try {
+    if (resendButton) return sendVerification(resendButton);
+    if (checkButton) return refreshEmailVerification(true);
+    if (completeButton) {
+      await setNotificationState(decodeId(completeButton.dataset.completeNotification), false);
+      toast("✓ Als erledigt markiert");
+      return;
+    }
+    if (deleteButton) {
+      if (!confirm("Diese Benachrichtigung wirklich löschen? Sie verschwindet aus deinem Bereich.")) return;
+      await setNotificationState(decodeId(deleteButton.dataset.deleteNotification), true);
+      toast("✓ Benachrichtigung gelöscht");
+    }
+  } catch {
+    toast("Die Benachrichtigung konnte nicht geändert werden.");
+  }
+}
+
+function startNotificationListeners() {
+  notificationAllUnsubscribe?.();
+  notificationSpecificUnsubscribe?.();
+  notificationStateUnsubscribe?.();
+  notificationSources = { all: [], specific: [] };
+  notificationStates = new Map();
+  const uid = currentContext.user.uid;
+  const consume = key => snapshot => {
+    notificationSources[key] = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    renderNotifications();
+  };
+  notificationAllUnsubscribe = onSnapshot(
+    query(collection(db, "notifications"), where("targetType", "==", "all")),
+    consume("all"),
+    () => { notificationSources.all = []; renderNotifications(); }
+  );
+  notificationSpecificUnsubscribe = onSnapshot(
+    query(collection(db, "notifications"), where("targetUids", "array-contains", uid)),
+    consume("specific"),
+    () => { notificationSources.specific = []; renderNotifications(); }
+  );
+  notificationStateUnsubscribe = onSnapshot(
+    collection(db, "notificationStates", uid, "items"),
+    snapshot => {
+      notificationStates = new Map(snapshot.docs.map(item => [item.id, item.data()]));
+      renderNotifications();
+    },
+    () => { notificationStates = new Map(); renderNotifications(); }
+  );
+  renderNotifications();
+}
+
+function notificationData({ title, message, targetUids, targetNames, kind = "automatic", sourceType = null, sourceId = null }) {
+  const specific = targetUids.length > 0;
+  return {
+    title,
+    message,
+    kind,
+    targetType: specific ? "specific" : "all",
+    targetUids,
+    targetNames,
+    authorUid: currentContext.user.uid,
+    authorName: currentContext.profile.nickname,
+    sourceType,
+    sourceId,
+    createdAt: serverTimestamp()
+  };
+}
+
+function renderNotificationPeople() {
+  const container = document.getElementById("g23f-notification-people");
+  if (!container) return;
+  const search = String(document.getElementById("g23f-notification-people-search")?.value || "").trim().toLocaleLowerCase("de-CH");
+  const accounts = adminAccounts.filter(account => !account.blocked && (!search || itemName(account).toLocaleLowerCase("de-CH").includes(search)));
+  container.innerHTML = accounts.length ? accounts.map(account => `<label class="g23f-notification-person"><input type="checkbox" value="${escapeHTML(account.uid)}" ${notificationSelectedUids.has(account.uid) ? "checked" : ""}><span>${escapeHTML(account.nickname)}${account.uid === currentContext.user.uid ? " (du)" : ""}</span></label>`).join("") : '<span class="g23f-shell-muted">Keine passende Person gefunden.</span>';
+}
+
+function toggleNotificationForm(open) {
+  const form = document.getElementById("g23f-notification-form");
+  if (!form || !currentContext?.admin) return;
+  form.hidden = !open;
+  document.getElementById("g23f-notification-error").textContent = "";
+  if (!open) {
+    form.reset();
+    notificationSelectedUids = new Set();
+    document.getElementById("g23f-notification-people-wrap").hidden = true;
+    renderNotificationPeople();
+  }
+  if (open) {
+    loadAccounts();
+    setTimeout(() => document.getElementById("g23f-notification-title")?.focus(), 30);
+  }
+}
+
+async function submitNotification(event) {
+  event.preventDefault();
+  if (!currentContext?.admin) return;
+  const title = document.getElementById("g23f-notification-title").value.trim();
+  const message = document.getElementById("g23f-notification-message").value.trim();
+  const target = document.getElementById("g23f-notification-target").value;
+  const selectedUids = target === "specific" ? [...notificationSelectedUids] : [];
+  const recipients = adminAccounts.filter(account => selectedUids.includes(account.uid));
+  const error = document.getElementById("g23f-notification-error");
+  if (!title || !message) return void (error.textContent = "Titel und Nachricht dürfen nicht leer sein.");
+  if (target === "specific" && recipients.length === 0) return void (error.textContent = "Wähle mindestens eine Person aus.");
+  const button = document.getElementById("g23f-notification-submit");
+  button.disabled = true;
+  try {
+    await addDoc(collection(db, "notifications"), notificationData({
+      title,
+      message,
+      targetUids: recipients.map(account => account.uid),
+      targetNames: recipients.map(account => account.nickname),
+      kind: "manual"
+    }));
+    event.currentTarget.reset();
+    notificationSelectedUids = new Set();
+    document.getElementById("g23f-notification-people-wrap").hidden = true;
+    toggleNotificationForm(false);
+    toast("✓ Benachrichtigung gesendet");
+  } catch {
+    error.textContent = "Die Benachrichtigung konnte nicht gesendet werden.";
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function resizeImage(file, maxSize = 220) {
@@ -242,12 +533,16 @@ async function resetPassword() {
   }
 }
 
-async function sendVerification() {
+async function sendVerification(buttonOrEvent = null) {
+  const button = buttonOrEvent?.currentTarget || buttonOrEvent;
+  if (button instanceof HTMLButtonElement) button.disabled = true;
   try {
     await sendEmailVerification(currentContext.user, { url: new URL(currentContext.rootPath, location.href).href });
-    toast("Bestätigungsmail gesendet. Wichtig, prüfe direkt auch den Spam-Ordner.");
+    toast("✓ Firebase hat den Versand angenommen. Prüfe in einigen Minuten den Posteingang und den SPAM-ORDNER.");
   } catch (error) {
     toast(error?.code === "auth/too-many-requests" ? "Warte kurz, bevor du die Mail nochmals sendest." : "Die Mail konnte nicht gesendet werden.");
+  } finally {
+    if (button instanceof HTMLButtonElement) button.disabled = false;
   }
 }
 
@@ -264,18 +559,20 @@ async function exportOwnData() {
   button.disabled = true;
   try {
     const uid = currentContext.user.uid;
-    const [notes, folders, progress, feedback, entries] = await Promise.all([
+    const [notes, folders, progress, feedback, entries, tripCards] = await Promise.all([
       getDocs(collection(db, "notes", uid, "items")),
       getDocs(collection(db, "noteFolders", uid, "folders")),
       getDocs(collection(db, "entryProgress", uid, "items")),
       getDocs(query(collection(db, "feedback"), where("authorUid", "==", uid))),
-      getDocs(query(collection(db, "eintraege"), where("authorUid", "==", uid)))
+      getDocs(query(collection(db, "eintraege"), where("authorUid", "==", uid))),
+      getDocs(query(collection(db, "maturareiseBoard"), where("authorUid", "==", uid)))
     ]);
     const clean = snapshot => snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
     download(`g23f-daten-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({
       exportedAt: new Date().toISOString(), profile: currentContext.profile,
       notes: clean(notes), folders: clean(folders), completedEntries: clean(progress),
-      feedback: clean(feedback), ownTimetableEntries: clean(entries)
+      feedback: clean(feedback), ownTimetableEntries: clean(entries),
+      ownMaturareiseCards: clean(tripCards)
     }, null, 2));
     toast("✓ Eigene Daten exportiert");
   } catch {
@@ -370,6 +667,9 @@ function startAccountBlockListener() {
     feedbackUnsubscribe?.();
     reportsUnsubscribe?.();
     accountBlockUnsubscribe?.();
+    notificationAllUnsubscribe?.();
+    notificationSpecificUnsubscribe?.();
+    notificationStateUnsubscribe?.();
     signOut(auth).finally(() => location.replace(`${currentContext.rootPath}?error=blocked`));
   }, () => {});
 }
@@ -401,8 +701,10 @@ async function loadAccounts() {
       .filter(item => item.nickname)
       .sort((a, b) => itemName(a).localeCompare(itemName(b), "de-CH", { sensitivity: "base" }));
     renderAdmin();
+    renderNotificationPeople();
   } catch {
     adminAccounts = [];
+    renderNotificationPeople();
   }
 }
 
@@ -472,7 +774,25 @@ async function handleAdminAction(event) {
   if (status) {
     if (event.type !== "change") return;
     try {
-      await updateDoc(doc(db, "feedback", decodeId(status.dataset.feedbackStatus)), { status: status.value, updatedAt: serverTimestamp(), updatedByUid: currentContext.user.uid });
+      const feedbackId = decodeId(status.dataset.feedbackStatus);
+      const feedback = adminFeedback.find(item => item.id === feedbackId);
+      if (!feedback || feedback.status === status.value) return;
+      const batch = writeBatch(db);
+      batch.update(doc(db, "feedback", feedbackId), {
+        status: status.value,
+        updatedAt: serverTimestamp(),
+        updatedByUid: currentContext.user.uid
+      });
+      const preview = feedback.message.length > 70 ? `${feedback.message.slice(0, 67)}…` : feedback.message;
+      batch.set(doc(collection(db, "notifications")), notificationData({
+        title: "Feedback aktualisiert",
+        message: `Deine Rückmeldung «${preview}» hat jetzt den Status «${STATUS_LABELS[status.value]}».`,
+        targetUids: [feedback.authorUid],
+        targetNames: [feedback.authorName],
+        sourceType: "feedback",
+        sourceId: feedbackId
+      }));
+      await batch.commit();
       toast("✓ Feedback-Status aktualisiert");
     } catch {
       toast("Der Status konnte nicht aktualisiert werden.");
@@ -488,12 +808,35 @@ async function handleAdminAction(event) {
     if (deleteFeedbackButton && confirm("Dieses Feedback wirklich löschen?")) {
       await deleteDoc(doc(db, "feedback", decodeId(deleteFeedbackButton.dataset.deleteFeedback)));
     } else if (resolveReportButton) {
-      await updateDoc(doc(db, "reports", decodeId(resolveReportButton.dataset.resolveReport)), { status: "resolved", resolvedAt: serverTimestamp(), resolvedByUid: currentContext.user.uid });
+      const reportId = decodeId(resolveReportButton.dataset.resolveReport);
+      const report = adminReports.find(item => item.id === reportId);
+      if (!report) return;
+      const batch = writeBatch(db);
+      batch.update(doc(db, "reports", reportId), { status: "resolved", resolvedAt: serverTimestamp(), resolvedByUid: currentContext.user.uid });
+      batch.set(doc(collection(db, "notifications")), notificationData({
+        title: "Meldung bearbeitet",
+        message: "Deine Meldung wurde geprüft und als erledigt markiert.",
+        targetUids: [report.reporterUid],
+        targetNames: [report.reporterName],
+        sourceType: "report",
+        sourceId: reportId
+      }));
+      await batch.commit();
     } else if (deleteEntryButton && confirm("Diesen gemeldeten Eintrag wirklich löschen? Der geschützte Inhalt wird nicht geöffnet.")) {
       const report = adminReports.find(item => item.id === decodeId(deleteEntryButton.dataset.deleteReportedEntry));
       if (report) {
-        await deleteDoc(doc(db, "eintraege", report.targetId));
-        await updateDoc(doc(db, "reports", report.id), { status: "resolved", resolvedAt: serverTimestamp(), resolvedByUid: currentContext.user.uid });
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "eintraege", report.targetId));
+        batch.update(doc(db, "reports", report.id), { status: "resolved", resolvedAt: serverTimestamp(), resolvedByUid: currentContext.user.uid });
+        batch.set(doc(collection(db, "notifications")), notificationData({
+          title: "Gemeldeter Eintrag entfernt",
+          message: "Der von dir gemeldete Stundenplaneintrag wurde geprüft und entfernt.",
+          targetUids: [report.reporterUid],
+          targetNames: [report.reporterName],
+          sourceType: "report",
+          sourceId: report.id
+        }));
+        await batch.commit();
       }
     } else if (blockReportedButton && confirm("Dieses Konto wirklich sperren?")) {
       const report = adminReports.find(item => item.id === decodeId(blockReportedButton.dataset.blockReportedUser));
@@ -514,6 +857,9 @@ async function logout() {
   feedbackUnsubscribe?.();
   reportsUnsubscribe?.();
   accountBlockUnsubscribe?.();
+  notificationAllUnsubscribe?.();
+  notificationSpecificUnsubscribe?.();
+  notificationStateUnsubscribe?.();
   try { localStorage.removeItem("g23f-session-expected"); } catch {}
   await signOut(auth);
   location.href = currentContext.rootPath;
@@ -545,82 +891,19 @@ async function registerServiceWorker() {
   } catch { /* Installation remains optional. */ }
 }
 
-function dismissVerificationBanner() {
-  const banner = document.getElementById("g23f-verify-banner");
-  if (!banner || banner.hidden || banner.classList.contains("dismissing")) return;
-  banner.style.removeProperty("transform");
-  banner.style.removeProperty("opacity");
-  banner.classList.add("dismissing");
-  setTimeout(() => {
-    banner.hidden = true;
-    banner.classList.remove("dismissing");
-    banner.style.removeProperty("transform");
-    banner.style.removeProperty("opacity");
-  }, 190);
-}
-
-function setupVerificationBanner() {
-  const banner = document.getElementById("g23f-verify-banner");
-  if (!banner || banner.dataset.dismissReady === "true") return;
-  banner.dataset.dismissReady = "true";
-  document.getElementById("g23f-dismiss-verification")?.addEventListener("click", dismissVerificationBanner);
-
-  let startX = 0;
-  let startY = 0;
-  let currentX = 0;
-  let currentY = 0;
-  let tracking = false;
-
-  const resetPosition = () => {
-    banner.style.removeProperty("transform");
-    banner.style.removeProperty("opacity");
-  };
-
-  banner.addEventListener("touchstart", event => {
-    if (event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    startX = currentX = touch.clientX;
-    startY = currentY = touch.clientY;
-    tracking = true;
-  }, { passive: true });
-
-  banner.addEventListener("touchmove", event => {
-    if (!tracking || event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    currentX = touch.clientX;
-    currentY = touch.clientY;
-    const deltaX = currentX - startX;
-    const deltaY = currentY - startY;
-    if (deltaY >= 0 || Math.abs(deltaY) <= Math.abs(deltaX)) return resetPosition();
-    event.preventDefault();
-    const distance = Math.max(deltaY, -90);
-    banner.style.transform = `translateY(${distance}px)`;
-    banner.style.opacity = String(Math.max(.25, 1 - Math.abs(distance) / 100));
-  }, { passive: false });
-
-  banner.addEventListener("touchend", () => {
-    if (!tracking) return;
-    tracking = false;
-    const deltaX = currentX - startX;
-    const deltaY = currentY - startY;
-    if (deltaY < -42 && Math.abs(deltaY) > Math.abs(deltaX) * 1.2) dismissVerificationBanner();
-    else resetPosition();
-  }, { passive: true });
-  banner.addEventListener("touchcancel", () => { tracking = false; resetPosition(); }, { passive: true });
-  banner.addEventListener("wheel", event => {
-    if (event.deltaY >= -18) return;
-    event.preventDefault();
-    dismissVerificationBanner();
-  }, { passive: false });
-}
-
 export function mountGlobalShell({ user, profile, rootPath = "./", pageLabel = "G23f-Insider", onProfileUpdated = null }) {
   currentContext = { user, profile, rootPath, pageLabel, admin: isAdminUser(user), onProfileUpdated };
   injectShell();
+  ensureNotificationTriggers();
   updateProfileTriggers();
   renderProfile();
 
   document.querySelectorAll("[data-g23f-profile]").forEach(button => button.addEventListener("click", () => { renderProfile(); setModal("g23f-profile-modal", true); }));
+  document.querySelectorAll("[data-g23f-notifications]").forEach(button => button.addEventListener("click", () => {
+    setModal("g23f-notifications-modal", true);
+    renderNotifications();
+    refreshEmailVerification();
+  }));
   document.querySelectorAll("[data-g23f-admin]").forEach(button => button.addEventListener("click", () => { adminTab = "feedback"; setModal("g23f-admin-modal", true); renderAdmin(); loadAccounts(); }));
   document.querySelectorAll("[data-g23f-logout]").forEach(button => button.addEventListener("click", logout));
   document.querySelectorAll("[data-g23f-feedback]").forEach(button => button.addEventListener("click", () => openFeedback()));
@@ -636,14 +919,27 @@ export function mountGlobalShell({ user, profile, rootPath = "./", pageLabel = "
   });
   document.getElementById("g23f-admin-content").addEventListener("click", handleAdminAction);
   document.getElementById("g23f-admin-content").addEventListener("change", handleAdminAction);
-  document.getElementById("g23f-resend-verification").addEventListener("click", sendVerification);
+  document.getElementById("g23f-notification-list").addEventListener("click", handleNotificationAction);
+  document.getElementById("g23f-new-notification").addEventListener("click", () => toggleNotificationForm(true));
+  document.getElementById("g23f-notification-cancel").addEventListener("click", () => toggleNotificationForm(false));
+  document.getElementById("g23f-notification-form").addEventListener("submit", submitNotification);
+  document.getElementById("g23f-notification-target").addEventListener("change", event => {
+    const specific = event.target.value === "specific";
+    document.getElementById("g23f-notification-people-wrap").hidden = !specific;
+    if (specific) renderNotificationPeople();
+  });
+  document.getElementById("g23f-notification-people-search").addEventListener("input", renderNotificationPeople);
+  document.getElementById("g23f-notification-people").addEventListener("change", event => {
+    const input = event.target.closest('input[type="checkbox"]');
+    if (!input) return;
+    if (input.checked) notificationSelectedUids.add(input.value);
+    else notificationSelectedUids.delete(input.value);
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !currentContext?.user?.emailVerified) refreshEmailVerification();
+  });
 
-  const verificationBanner = document.getElementById("g23f-verify-banner");
-  verificationBanner.classList.remove("dismissing");
-  verificationBanner.style.removeProperty("transform");
-  verificationBanner.style.removeProperty("opacity");
-  verificationBanner.hidden = user.emailVerified || !user.email;
-  setupVerificationBanner();
+  startNotificationListeners();
   startFeedbackListener();
   startAdminListeners();
   startAccountBlockListener();

@@ -30,6 +30,11 @@
       "name": "G23f-Notes",
       "short_name": "Notes",
       "url": "/notes/"
+    },
+    {
+      "name": "Maturareise 2027",
+      "short_name": "Maturareise",
+      "url": "/maturareise/"
     }
   ],
   "icons": [

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Maturareise 2027 | G23f-Insider</title>
+  <meta name="theme-color" content="#F5F1EA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" href="../icon-192.png">
+  <link rel="apple-touch-icon" href="../icon-192.png">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="../shared/session.js">
+  <link rel="modulepreload" href="../shared/shell.js">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../shared/shell.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="back-btn" href="../" aria-label="Zurück zur Startseite">← <span>Zurück</span></a>
+    <a class="brand" href="../">G23f-Insider <span>/ Maturareise</span></a>
+    <nav class="page-nav" aria-label="Weitere Hauptbereiche">
+      <a href="../stundenplan/">Stundenplan</a>
+      <a href="../notes/">Notes</a>
+      <a href="../faecher/">Fächer</a>
+    </nav>
+    <div class="header-account" id="header-account" hidden>
+      <button class="header-icon" type="button" data-g23f-admin hidden aria-label="Admin-Inbox öffnen">📥</button>
+      <button class="profile-button" type="button" data-g23f-profile hidden aria-label="Eigenes Profil öffnen"></button>
+      <button class="logout-button" type="button" data-g23f-logout>Abmelden</button>
+    </div>
+  </header>
+
+  <main class="page-content" id="page-content" hidden>
+    <section class="page-hero">
+      <div>
+        <p class="eyebrow">Sommer 2027</p>
+        <h1>📄 Maturareise</h1>
+        <p>Unsere gemeinsame freie Fläche für Ziele, Ideen, Links, Budgets und alles, was uns einfällt.</p>
+      </div>
+      <button class="add-card-btn" id="add-card-btn" type="button">＋ Text hinzufügen</button>
+    </section>
+
+    <section class="board-panel" aria-labelledby="board-title">
+      <div class="board-toolbar">
+        <div>
+          <p class="eyebrow">Gemeinsames Blatt</p>
+          <h2 id="board-title">Planung</h2>
+        </div>
+        <p><strong id="card-count">0 Beiträge</strong><span> Ziehe deine Beiträge an die gewünschte Stelle. Mit einem Doppelklick auf eine freie Stelle erstellst du dort einen neuen.</span></p>
+      </div>
+      <div class="board-viewport" id="board-viewport">
+        <div class="trip-board" id="trip-board" aria-live="polite">
+          <div class="board-empty" id="board-empty">
+            <span>📄</span>
+            <strong>Noch ist das Blatt leer.</strong>
+            <p>Füge den ersten Gedanken zur Maturareise hinzu.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="site-footer" hidden>
+    <span>G23f-Insider · Maturareise 2027</span>
+    <button type="button" data-g23f-feedback>💬 Fehler oder Idee melden</button>
+  </footer>
+
+  <div class="modal-backdrop" id="card-editor" hidden>
+    <section class="editor-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <button class="modal-close" id="close-editor-btn" type="button" aria-label="Schliessen">✕</button>
+      <p class="eyebrow">Maturareise 2027</p>
+      <h2 id="editor-title">Text hinzufügen</h2>
+      <label for="card-content">Dein Beitrag</label>
+      <textarea id="card-content" rows="9" maxlength="3000" placeholder="Schreib einfach los …"></textarea>
+      <fieldset class="color-picker">
+        <legend>Blattfarbe</legend>
+        <label><input type="radio" name="card-color" value="sand" checked><span class="sand">Sand</span></label>
+        <label><input type="radio" name="card-color" value="yellow"><span class="yellow">Gelb</span></label>
+        <label><input type="radio" name="card-color" value="rose"><span class="rose">Rosa</span></label>
+        <label><input type="radio" name="card-color" value="blue"><span class="blue">Blau</span></label>
+        <label><input type="radio" name="card-color" value="green"><span class="green">Grün</span></label>
+      </fieldset>
+      <p class="editor-meta" id="editor-meta"></p>
+      <p class="form-error" id="editor-error" role="alert"></p>
+      <div class="editor-actions">
+        <button class="delete-btn" id="delete-card-btn" type="button" hidden>Löschen</button>
+        <button class="save-btn" id="save-card-btn" type="button">Speichern</button>
+      </div>
+    </section>
+  </div>
+
+  <button class="floating-add" id="floating-add-btn" type="button" aria-label="Text hinzufügen" hidden>＋</button>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="loading-layer" id="loading-layer"><div class="spinner"></div><span>Klassenkonto wird geladen …</span></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
