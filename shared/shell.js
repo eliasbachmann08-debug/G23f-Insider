@@ -1,6 +1,6 @@
 import {
   collection, addDoc, deleteDoc, doc, getDocs, onSnapshot, query,
-  serverTimestamp, updateDoc, where
+  serverTimestamp, setDoc, updateDoc, where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   sendEmailVerification, sendPasswordResetEmail, signOut
@@ -16,6 +16,7 @@ const CATEGORY_LABELS = {
 let currentContext = null;
 let feedbackUnsubscribe = null;
 let reportsUnsubscribe = null;
+let accountBlockUnsubscribe = null;
 let ownFeedback = [];
 let adminFeedback = [];
 let adminReports = [];
@@ -133,8 +134,15 @@ function injectShell() {
     </div>
     <div class="g23f-notification-stack">
       <div class="g23f-verify-banner" id="g23f-verify-banner" hidden>
-        <span>Bestätige noch deine E-Mail-Adresse. Falls die Mail fehlt, prüfe auch den Spam-Ordner.</span>
-        <button class="g23f-shell-btn" id="g23f-resend-verification" type="button">Mail erneut senden</button>
+        <div class="g23f-verify-copy">
+          <strong>⚠️ E-Mail noch bestätigen</strong>
+          <span><b>Wichtig:</b> Die Bestätigungsmail landet häufig im Spam-Ordner. Prüfe ihn direkt, falls die Mail fehlt.</span>
+          <small>Nach oben wischen oder den Pfeil antippen, um den Hinweis auszublenden.</small>
+        </div>
+        <div class="g23f-verify-actions">
+          <button class="g23f-shell-btn" id="g23f-resend-verification" type="button">Mail erneut senden</button>
+          <button class="g23f-verify-dismiss" id="g23f-dismiss-verification" type="button" aria-label="Hinweis bis zum nächsten Seitenaufruf ausblenden">↑</button>
+        </div>
       </div>
       <div class="g23f-update-banner" id="g23f-update-banner" hidden>
         <span>Eine neue Version ist verfügbar.</span>
@@ -237,7 +245,7 @@ async function resetPassword() {
 async function sendVerification() {
   try {
     await sendEmailVerification(currentContext.user, { url: new URL(currentContext.rootPath, location.href).href });
-    toast("Bestätigungsmail gesendet. Sie kann etwas später eintreffen, prüfe auch den Spam-Ordner.");
+    toast("Bestätigungsmail gesendet. Wichtig, prüfe direkt auch den Spam-Ordner.");
   } catch (error) {
     toast(error?.code === "auth/too-many-requests" ? "Warte kurz, bevor du die Mail nochmals sendest." : "Die Mail konnte nicht gesendet werden.");
   }
@@ -353,15 +361,43 @@ function startAdminListeners() {
   loadAccounts();
 }
 
+function startAccountBlockListener() {
+  accountBlockUnsubscribe?.();
+  accountBlockUnsubscribe = null;
+  if (currentContext.admin) return;
+  accountBlockUnsubscribe = onSnapshot(doc(db, "accountBlocks", currentContext.user.uid), snapshot => {
+    if (!snapshot.exists()) return;
+    feedbackUnsubscribe?.();
+    reportsUnsubscribe?.();
+    accountBlockUnsubscribe?.();
+    signOut(auth).finally(() => location.replace(`${currentContext.rootPath}?error=blocked`));
+  }, () => {});
+}
+
 async function loadAccounts() {
   if (!currentContext.admin) return;
   try {
-    const [profilesSnapshot, membersSnapshot] = await Promise.all([
-      getDocs(collection(db, "users")), getDocs(collection(db, "members"))
+    const [profilesSnapshot, membersSnapshot, blocksSnapshot] = await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(collection(db, "members")),
+      getDocs(collection(db, "accountBlocks")).catch(() => ({ docs: [] }))
     ]);
     const members = new Map(membersSnapshot.docs.map(item => [item.id, item.data()]));
+    const blocks = new Set(blocksSnapshot.docs.map(item => item.id));
     adminAccounts = profilesSnapshot.docs
-      .map(item => ({ uid: item.id, ...item.data(), blocked: Boolean(members.get(item.id)?.blocked) }))
+      .map(item => {
+        const member = members.get(item.id);
+        const legacyMemberBlocked = Boolean(member?.blocked);
+        const hasBlock = blocks.has(item.id);
+        return {
+          uid: item.id,
+          ...item.data(),
+          blocked: legacyMemberBlocked || hasBlock,
+          legacyMemberBlocked,
+          hasBlock,
+          hasMember: Boolean(member)
+        };
+      })
       .filter(item => item.nickname)
       .sort((a, b) => itemName(a).localeCompare(itemName(b), "de-CH", { sensitivity: "base" }));
     renderAdmin();
@@ -372,6 +408,31 @@ async function loadAccounts() {
 
 function itemName(item) {
   return String(item.nickname || item.authorName || "Unbekannt");
+}
+
+async function setAccountBlocked(uid, shouldBlock) {
+  if (!currentContext?.admin || uid === currentContext.user.uid) throw new Error("invalid-block-target");
+  const blockRef = doc(db, "accountBlocks", uid);
+  if (shouldBlock) {
+    await setDoc(blockRef, {
+      blocked: true,
+      createdAt: serverTimestamp(),
+      createdByUid: currentContext.user.uid
+    });
+    return;
+  }
+
+  const account = adminAccounts.find(item => item.uid === uid);
+  const tasks = [];
+  if (!account || account.hasBlock) tasks.push(deleteDoc(blockRef));
+  if (account?.hasMember && account.legacyMemberBlocked) {
+    tasks.push(updateDoc(doc(db, "members", uid), {
+      blocked: false,
+      blockedAt: null,
+      blockedByUid: null
+    }));
+  }
+  await Promise.all(tasks);
 }
 
 function updateAdminCount() {
@@ -436,11 +497,11 @@ async function handleAdminAction(event) {
       }
     } else if (blockReportedButton && confirm("Dieses Konto wirklich sperren?")) {
       const report = adminReports.find(item => item.id === decodeId(blockReportedButton.dataset.blockReportedUser));
-      if (report) await updateDoc(doc(db, "members", report.targetId), { blocked: true, blockedAt: serverTimestamp(), blockedByUid: currentContext.user.uid });
+      if (report) await setAccountBlocked(report.targetId, true);
     } else if (toggleAccountButton) {
       const blocked = toggleAccountButton.dataset.blocked === "true";
       if (!blocked && !confirm("Dieses Konto wirklich sperren?")) return;
-      await updateDoc(doc(db, "members", decodeId(toggleAccountButton.dataset.toggleAccount)), { blocked: !blocked, blockedAt: !blocked ? serverTimestamp() : null, blockedByUid: !blocked ? currentContext.user.uid : null });
+      await setAccountBlocked(decodeId(toggleAccountButton.dataset.toggleAccount), !blocked);
       await loadAccounts();
     }
     toast("✓ Adminbereich aktualisiert");
@@ -452,6 +513,7 @@ async function handleAdminAction(event) {
 async function logout() {
   feedbackUnsubscribe?.();
   reportsUnsubscribe?.();
+  accountBlockUnsubscribe?.();
   try { localStorage.removeItem("g23f-session-expected"); } catch {}
   await signOut(auth);
   location.href = currentContext.rootPath;
@@ -483,6 +545,75 @@ async function registerServiceWorker() {
   } catch { /* Installation remains optional. */ }
 }
 
+function dismissVerificationBanner() {
+  const banner = document.getElementById("g23f-verify-banner");
+  if (!banner || banner.hidden || banner.classList.contains("dismissing")) return;
+  banner.style.removeProperty("transform");
+  banner.style.removeProperty("opacity");
+  banner.classList.add("dismissing");
+  setTimeout(() => {
+    banner.hidden = true;
+    banner.classList.remove("dismissing");
+    banner.style.removeProperty("transform");
+    banner.style.removeProperty("opacity");
+  }, 190);
+}
+
+function setupVerificationBanner() {
+  const banner = document.getElementById("g23f-verify-banner");
+  if (!banner || banner.dataset.dismissReady === "true") return;
+  banner.dataset.dismissReady = "true";
+  document.getElementById("g23f-dismiss-verification")?.addEventListener("click", dismissVerificationBanner);
+
+  let startX = 0;
+  let startY = 0;
+  let currentX = 0;
+  let currentY = 0;
+  let tracking = false;
+
+  const resetPosition = () => {
+    banner.style.removeProperty("transform");
+    banner.style.removeProperty("opacity");
+  };
+
+  banner.addEventListener("touchstart", event => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    startX = currentX = touch.clientX;
+    startY = currentY = touch.clientY;
+    tracking = true;
+  }, { passive: true });
+
+  banner.addEventListener("touchmove", event => {
+    if (!tracking || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    currentX = touch.clientX;
+    currentY = touch.clientY;
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    if (deltaY >= 0 || Math.abs(deltaY) <= Math.abs(deltaX)) return resetPosition();
+    event.preventDefault();
+    const distance = Math.max(deltaY, -90);
+    banner.style.transform = `translateY(${distance}px)`;
+    banner.style.opacity = String(Math.max(.25, 1 - Math.abs(distance) / 100));
+  }, { passive: false });
+
+  banner.addEventListener("touchend", () => {
+    if (!tracking) return;
+    tracking = false;
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    if (deltaY < -42 && Math.abs(deltaY) > Math.abs(deltaX) * 1.2) dismissVerificationBanner();
+    else resetPosition();
+  }, { passive: true });
+  banner.addEventListener("touchcancel", () => { tracking = false; resetPosition(); }, { passive: true });
+  banner.addEventListener("wheel", event => {
+    if (event.deltaY >= -18) return;
+    event.preventDefault();
+    dismissVerificationBanner();
+  }, { passive: false });
+}
+
 export function mountGlobalShell({ user, profile, rootPath = "./", pageLabel = "G23f-Insider", onProfileUpdated = null }) {
   currentContext = { user, profile, rootPath, pageLabel, admin: isAdminUser(user), onProfileUpdated };
   injectShell();
@@ -507,9 +638,15 @@ export function mountGlobalShell({ user, profile, rootPath = "./", pageLabel = "
   document.getElementById("g23f-admin-content").addEventListener("change", handleAdminAction);
   document.getElementById("g23f-resend-verification").addEventListener("click", sendVerification);
 
-  document.getElementById("g23f-verify-banner").hidden = user.emailVerified || !user.email;
+  const verificationBanner = document.getElementById("g23f-verify-banner");
+  verificationBanner.classList.remove("dismissing");
+  verificationBanner.style.removeProperty("transform");
+  verificationBanner.style.removeProperty("opacity");
+  verificationBanner.hidden = user.emailVerified || !user.email;
+  setupVerificationBanner();
   startFeedbackListener();
   startAdminListeners();
+  startAccountBlockListener();
   registerServiceWorker();
   return { openFeedback, openProfile: () => setModal("g23f-profile-modal", true), toast };
 }

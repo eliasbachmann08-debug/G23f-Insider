@@ -140,11 +140,11 @@ function updateHeader() {
   // The shared profile component keeps the account button identical everywhere.
 }
 
-async function loadSession(user) {
+async function loadSession(user, preloadedSession = null) {
   currentUser = user;
   showLoading("Private Notizen werden geladen …");
   try {
-    if (!isAdmin()) {
+    if (!isAdmin() && !preloadedSession) {
       const member = await getDoc(doc(db, "members", user.uid));
       if (!member.exists() || member.data().blocked) {
         if (member.exists() && member.data().blocked) {
@@ -157,10 +157,14 @@ async function loadSession(user) {
       }
     }
 
-    const profile = await getDoc(doc(db, "users", user.uid));
-    currentProfile = profile.exists()
-      ? { uid: user.uid, ...profile.data() }
-      : { uid: user.uid, nickname: isAdmin() ? "Elias" : user.email.split("@")[0] };
+    if (preloadedSession?.profileExists) {
+      currentProfile = preloadedSession.profile;
+    } else {
+      const profile = await getDoc(doc(db, "users", user.uid));
+      currentProfile = profile.exists()
+        ? { uid: user.uid, ...profile.data() }
+        : { uid: user.uid, nickname: isAdmin() ? "Elias" : user.email.split("@")[0] };
+    }
     updateHeader();
     showScreen("screen-notes");
     startListeners();
@@ -762,4 +766,4 @@ document.addEventListener("keydown", event => {
 });
 
 const protectedSession = await requireClassSession("../");
-if (protectedSession) await loadSession(protectedSession.user);
+if (protectedSession) await loadSession(protectedSession.user, protectedSession);

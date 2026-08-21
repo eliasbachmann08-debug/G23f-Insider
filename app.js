@@ -10,7 +10,7 @@ import { auth, authReady, db, isAdminUser } from "./shared/firebase.js";
 import { mountGlobalShell } from "./shared/shell.js";
 
 const $ = id => document.getElementById(id);
-const COLLECTIONS = { entries: "eintraege", users: "users", members: "members", handles: "handles", tickets: "registrationTickets" };
+const COLLECTIONS = { entries: "eintraege", users: "users", members: "members", handles: "handles", tickets: "registrationTickets", blocks: "accountBlocks" };
 const TYPE_META = {
   hausaufgabe: { short: "HA", icon: "✏️" }, test: { short: "Test", icon: "📝" }, organisatorisch: { short: "Org.", icon: "📌" }
 };
@@ -19,7 +19,6 @@ let currentUser = null;
 let currentProfile = null;
 let entries = [];
 let notes = [];
-let subjects = [];
 let completedEntries = new Set();
 let authBusy = false;
 let sessionRun = 0;
@@ -37,7 +36,7 @@ const ONBOARDING_VERSION = "v2";
 const ONBOARDING_STEPS = [
   {
     icon: "👋", kicker: "Willkomme", title: "Härzlech wellkomme bi G23f-Insider!",
-    copy: "Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. D Bestätigungsmail cha chli später cho, lueg falls nötig au im Spam-Ordner."
+    copy: "Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. Wichtig, d Bestätigungsmail landet hüfig im Spam-Ordner."
   },
   {
     icon: "🧭", kicker: "Direkt loslege", title: "Drei wichtige Bereiche",
@@ -49,7 +48,7 @@ const ONBOARDING_STEPS = [
   },
   {
     icon: "🔎", kicker: "Schnell finden", title: "Schnellfinder und Suche",
-    copy: "Mit Heute, Diese Woche und Nächster Test findest du Wichtiges sofort. Die Suche prüft Stundenplan, Lernapps und deine eigenen Notes."
+    copy: "Mit Heute, Diese Woche und Nächster Test findest du Wichtiges sofort. Die Suche prüft den Stundenplan und deine eigenen Notes. Die Lernapps erreichst du über Fächer."
   },
   {
     icon: "✨", kicker: "Gut zu wissen", title: "Profil, Download und Erstellen",
@@ -317,11 +316,17 @@ async function loadSession(user, { welcome = false } = {}) {
     let member = null;
     let profileSnapshot = null;
     if (!isAdminUser(user)) {
-      const [memberSnapshot, loadedProfileSnapshot] = await Promise.all([
+      const [memberSnapshot, loadedProfileSnapshot, blockSnapshot] = await Promise.all([
         getDoc(doc(db, COLLECTIONS.members, user.uid)),
-        getDoc(doc(db, COLLECTIONS.users, user.uid))
+        getDoc(doc(db, COLLECTIONS.users, user.uid)),
+        getDoc(doc(db, COLLECTIONS.blocks, user.uid)).catch(() => null)
       ]);
       profileSnapshot = loadedProfileSnapshot;
+      if (blockSnapshot?.exists()) {
+        await signOut(auth);
+        showAuth("login", "Dieses Konto wurde gesperrt. Melde dich bei Elias.");
+        return;
+      }
       if (!memberSnapshot.exists()) {
         let oldName = "";
         if (profileSnapshot.exists()) oldName = profileSnapshot.data().nickname || "";
@@ -354,7 +359,6 @@ async function loadSession(user, { welcome = false } = {}) {
     showApp();
     startDataListeners();
     hideLoading();
-    loadSubjects();
     if (showOnboarding) requestAnimationFrame(() => openWelcome(returnTarget));
   } catch (error) {
     console.error(error);
@@ -398,7 +402,7 @@ async function handleRegistration(event) {
     await closeRegistrationTicket(ticket.ticketId);
     try {
       await sendEmailVerification(credential.user, { url: new URL("./", location.href).href });
-      toast("Konto erstellt, Bestätigungsmail gesendet. Prüfe bei Bedarf auch den Spam-Ordner.");
+      toast("Konto erstellt. Wichtig, prüfe für die Bestätigungsmail direkt auch den Spam-Ordner.");
     } catch { toast("Konto erstellt. Die Bestätigungsmail kann im Profil nochmals gesendet werden."); }
     $("register-class-password").value = "";
     await loadSession(credential.user, { welcome: true });
@@ -516,23 +520,6 @@ async function toggleCompleted(entryId) {
   } catch { toast("Der persönliche Status konnte nicht gespeichert werden."); }
 }
 
-async function loadSubjects() {
-  try {
-    const response = await fetch("faecher/faecher.json", { cache: "no-store" });
-    subjects = await response.json();
-    const ready = subjects.filter(subject => subject.verfuegbar).length;
-    $("subject-summary").textContent = `${ready} von ${subjects.length} verfügbar`;
-    $("faecher-grid").innerHTML = subjects.map(subject => subject.verfuegbar
-      ? `<a href="${escapeHTML(subject.pfad)}" class="subject-card" style="--card-color:${escapeHTML(subject.color)}"><div class="subject-top"><span class="subject-icon">${subject.icon}</span><span class="subject-tag">✓ Verfügbar</span></div><h3>${escapeHTML(subject.name)}</h3><p>${escapeHTML(subject.beschreibung || "Lernmaterial verfügbar.")}</p><div class="subject-pills">${(subject.themen || []).map(topic => `<span>${escapeHTML(topic)}</span>`).join("")}</div></a>`
-      : `<article class="subject-card inactive" style="--card-color:${escapeHTML(subject.color)}"><div class="subject-top"><span class="subject-icon">${subject.icon}</span><span class="subject-tag">Noch offen</span></div><h3>${escapeHTML(subject.name)}</h3><p>Wird hinzugefügt, sobald das Thema behandelt wird.</p></article>`).join("");
-    renderFinderSearch();
-  } catch {
-    subjects = [];
-    $("subject-summary").textContent = "Konnte nicht geladen werden";
-    $("faecher-grid").innerHTML = '<p class="empty-copy">Fächer konnten nicht geladen werden.</p>';
-  }
-}
-
 function resultGroup(title, items) {
   if (!items.length) return "";
   return `<section class="result-group"><h3>${escapeHTML(title)}</h3><div class="result-list">${items.join("")}</div></section>`;
@@ -561,13 +548,11 @@ function renderFinderSearch() {
   const search = normalized(raw);
   if (!search) { $("finder-results").hidden = true; $("finder-results").innerHTML = ""; return; }
   const entryMatches = entries.filter(entry => normalized(`${entryTitle(entry)} ${entry.thema || ""} ${entry.infos || ""} ${entry.authorName || ""}`).includes(search)).slice(0, 12);
-  const subjectMatches = subjects.filter(subject => normalized(`${subject.name} ${subject.beschreibung || ""} ${(subject.themen || []).join(" ")}`).includes(search)).slice(0, 8);
   const noteMatches = notes.filter(note => normalized(`${note.title || ""} ${note.contentText || ""}`).includes(search)).slice(0, 8);
   const entryHtml = entryMatches.map(entry => `<a class="result-item" href="${entryUrl(entry)}"><strong>${escapeHTML(entryTitle(entry))}</strong><span>${escapeHTML(dateLabel(entry.date))}</span></a>`);
-  const subjectHtml = subjectMatches.map(subject => subject.verfuegbar ? `<a class="result-item" href="${escapeHTML(subject.pfad)}"><strong>${escapeHTML(subject.name)}</strong><span>Lernapp</span></a>` : `<div class="result-item"><strong>${escapeHTML(subject.name)}</strong><span>Noch offen</span></div>`);
   const noteHtml = noteMatches.map(note => `<a class="result-item" href="notes/?note=${encodeURIComponent(note.id)}"><strong>${escapeHTML(note.title || "Ohne Titel")}</strong><span>Private Note</span></a>`);
   $("finder-results").hidden = false;
-  $("finder-results").innerHTML = resultGroup("Stundenplan", entryHtml) + resultGroup("Fächer", subjectHtml) + resultGroup("Eigene Notes", noteHtml) || `<p class="empty-copy">Nichts zu „${escapeHTML(raw)}“ gefunden.</p>`;
+  $("finder-results").innerHTML = resultGroup("Stundenplan", entryHtml) + resultGroup("Eigene Notes", noteHtml) || `<p class="empty-copy">Nichts zu „${escapeHTML(raw)}“ gefunden.</p>`;
 }
 
 function setupInstall() {
@@ -578,7 +563,12 @@ function setupInstall() {
   $("install-btn").addEventListener("click", async () => {
     if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; return; }
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    $("install-help").textContent = ios ? "Tippe auf Teilen und danach auf «Zum Home-Bildschirm»." : "Öffne das Browsermenü und wähle «App installieren» oder «Zum Startbildschirm hinzufügen».";
+    const samsung = /SamsungBrowser/i.test(navigator.userAgent);
+    $("install-help").textContent = ios
+      ? "Tippe auf Teilen und danach auf «Zum Home-Bildschirm». Die installierte App öffnet sich anschliessend eigenständig."
+      : samsung
+        ? "Entferne zuerst eine alte Verknüpfung. Öffne dann das Browsermenü, wähle «Seite hinzufügen zu» und danach «Startbildschirm». Mit dieser Version öffnet sich G23f-Insider eigenständig."
+        : "Lade die Seite einmal neu und tippe nochmals auf App installieren. Wähle danach ausdrücklich «App installieren». Eine alte reine Verknüpfung musst du zuerst vom Startbildschirm entfernen.";
     $("install-popup").hidden = false;
   });
   $("close-install").addEventListener("click", () => $("install-popup").hidden = true);

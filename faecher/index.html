@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fächer | G23f-Insider</title>
+  <meta name="theme-color" content="#F5F1EA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" href="../icon-192.png">
+  <link rel="apple-touch-icon" href="../icon-192.png">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="../shared/session.js">
+  <link rel="modulepreload" href="../shared/shell.js">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../shared/shell.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="back-btn" href="../" aria-label="Zurück zur Startseite">← <span>Zurück</span></a>
+    <a class="brand" href="../">G23f-Insider <span>/ Fächer</span></a>
+    <nav class="page-nav" aria-label="Weitere Hauptbereiche">
+      <a href="../stundenplan/">Stundenplan</a>
+      <a href="../notes/">Notes</a>
+    </nav>
+    <div class="header-account">
+      <button class="header-icon" type="button" data-g23f-admin hidden aria-label="Admin-Inbox öffnen">📥</button>
+      <button class="profile-button" type="button" data-g23f-profile hidden aria-label="Eigenes Profil öffnen"></button>
+      <button class="logout-button" type="button" data-g23f-logout>Abmelden</button>
+    </div>
+  </header>
+
+  <main class="page-content" id="page-content" hidden>
+    <section class="page-hero">
+      <p class="eyebrow">Lernapps</p>
+      <h1>🧠 Fächer</h1>
+      <p>Hier findest du alle Lerninhalte und Übungen nach Fach sortiert.</p>
+    </section>
+
+    <section class="subjects-panel" aria-labelledby="subjects-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Übersicht</p>
+          <h2 id="subjects-title">Fächer und Lernapps</h2>
+        </div>
+        <span id="subject-summary">Verfügbarkeit wird geprüft …</span>
+      </div>
+      <div class="subject-grid" id="subject-grid" aria-live="polite">
+        <p class="empty-copy">Fächer werden geladen …</p>
+      </div>
+    </section>
+
+    <aside class="disclaimer"><strong>Hinweis:</strong> Diese Lernapps ersetzen nicht das Lernen mit den Unterlagen. Die Theorie ist nach den Lernzielen der Lehrpersonen geordnet.</aside>
+  </main>
+
+  <footer class="site-footer" id="site-footer" hidden>
+    <span>G23f-Insider · Alle Rechte vorbehalten</span>
+    <button type="button" data-g23f-feedback>💬 Fehler oder Idee melden</button>
+  </footer>
+
+  <div class="loading-layer" id="loading-layer">
+    <div class="spinner"></div>
+    <span>Klassenkonto wird geladen …</span>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "g23f-insider-v6-2026-08-17";
+const CACHE_NAME = "g23f-insider-v7-2026-08-21";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -17,6 +17,9 @@ const APP_SHELL = [
   "./shared/session.js",
   "./shared/shell.css",
   "./shared/shell.js",
+  "./faecher/index.html",
+  "./faecher/styles.css",
+  "./faecher/app.js",
   "./faecher/faecher.json",
   "./faecher/biologie/index.html",
   "./faecher/biologie/app.js",

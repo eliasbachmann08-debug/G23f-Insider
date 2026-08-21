@@ -6,8 +6,11 @@
   <title>G23f-Insider</title>
   <meta name="theme-color" content="#8B7355">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="G23f-Insider">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,10 +28,10 @@
   <header class="site-header">
     <a class="logo" href="./" aria-label="G23f-Insider Startseite">G23f-Insider</a>
     <nav class="main-nav" id="main-nav" hidden>
-      <a href="stundenplan/">Stundenplan</a><a href="notes/">Notes</a><a href="#faecher">Fächer</a>
+      <a href="stundenplan/">Stundenplan</a><a href="notes/">Notes</a><a href="faecher/">Fächer</a>
     </nav>
     <div class="header-tools" id="header-tools" hidden>
-      <button class="install-btn" id="install-btn" type="button">⬇ <span>Download</span></button>
+      <button class="install-btn" id="install-btn" type="button" aria-label="G23f-Insider als App installieren">⬇ <span>App installieren</span></button>
       <button type="button" data-g23f-admin hidden aria-label="Admin-Inbox">📥</button>
       <button type="button" data-g23f-profile hidden aria-label="Eigenes Profil öffnen"></button>
     </div>
@@ -49,7 +52,11 @@
           <p class="form-error" id="login-error" role="alert"></p>
           <button class="primary-btn" id="login-submit" type="submit">Anmelden →</button>
           <button class="text-btn" id="forgot-password-btn" type="button">Passwort vergessen?</button>
-          <button class="text-btn" id="show-register-btn" type="button">Noch kein Konto? Konto erstellen</button>
+          <div class="register-callout">
+            <strong>Noch kein Konto?</strong>
+            <span>Dann musst du dich zuerst mit dem Klassenpasswort registrieren.</span>
+            <button class="register-start-btn" id="show-register-btn" type="button">Jetzt registrieren</button>
+          </div>
         </form>
       </div>
 
@@ -68,7 +75,7 @@
           <input id="register-password" type="password" minlength="6" autocomplete="new-password" placeholder="Mindestens 6 Zeichen" required>
           <label for="register-class-password">Klassenpasswort</label>
           <input id="register-class-password" type="password" autocomplete="off" placeholder="Klassenpasswort" required>
-          <p class="field-help">Die Bestätigungsmail kann etwas später eintreffen. Prüfe bei Bedarf auch den Spam-Ordner.</p>
+          <p class="field-help spam-help"><strong>Wichtig:</strong> Die Bestätigungsmail landet häufig im Spam-Ordner. Prüfe ihn direkt, falls die Mail nicht erscheint.</p>
           <p class="form-error" id="register-error" role="alert"></p>
           <button class="primary-btn" id="register-submit" type="submit">Konto erstellen →</button>
           <button class="text-btn" id="show-login-btn" type="button">Schon ein Konto? Anmelden</button>
@@ -101,7 +108,7 @@
       </section>
 
       <section class="feature-wrap primary-navigation page-width" aria-label="Hauptbereiche">
-        <a href="#faecher" class="feature-banner subjects-banner"><span class="feature-icon">🧠</span><span><small>Lernapps</small><strong>Fächer</strong><span>Lerninhalte ond Üebige nach Fach sortiert.</span></span><b>→</b></a>
+        <a href="faecher/" class="feature-banner subjects-banner"><span class="feature-icon">🧠</span><span><small>Lernapps</small><strong>Fächer</strong><span>Lerninhalte ond Üebige nach Fach sortiert.</span></span><b>→</b></a>
         <a href="stundenplan/" class="feature-banner timetable-banner"><span class="feature-icon">📅</span><span><small>Klasse</small><strong>Stundenplan</strong><span>Huusufgabe, Tests ond Termine, zäme iträge ond emmer aktuell.</span></span><b>→</b></a>
         <a href="notes/" class="feature-banner notes-banner"><span class="feature-icon">🗒️</span><span><small>Privat</small><strong>G23f-Notes</strong><span>Eigeti Notize, Ordner ond Liste, nor för dech sechtbar.</span></span><b>→</b></a>
       </section>
@@ -126,16 +133,10 @@
             <button type="button" data-finder="test">Nächster Test</button>
           </div>
         </div>
-        <div class="global-search" role="search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" autocomplete="off" aria-label="Stundenplan, Fächer und eigene Notes durchsuchen" placeholder="Stundenplan, Fächer und eigene Notes durchsuchen"><button id="clear-search" type="button" aria-label="Suche löschen">✕</button></div>
+        <div class="global-search" role="search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" autocomplete="off" aria-label="Stundenplan und eigene Notes durchsuchen" placeholder="Stundenplan und eigene Notes durchsuchen"><button id="clear-search" type="button" aria-label="Suche löschen">✕</button></div>
         <div class="finder-results" id="finder-results" hidden></div>
       </section>
 
-      <section class="subjects page-width" id="faecher">
-        <div class="section-head"><div><p class="eyebrow">Lernen</p><h2>Fächer &amp; Lernapps</h2></div><span id="subject-summary">Verfügbarkeit wird geprüft …</span></div>
-        <div class="subject-grid" id="faecher-grid"><p class="empty-copy">Lädt …</p></div>
-      </section>
-
-      <section class="disclaimer page-width"><strong>Hinweis:</strong> Diese Lernapps ersetzen nicht das Lernen mit den Unterlagen. Die Theorie ist nach den Lernzielen der Lehrpersonen geordnet.</section>
     </div>
   </main>
 
@@ -150,7 +151,7 @@
     <a href="notes/?new=1">🗒️ Private Notiz</a>
   </div>
 
-  <div class="install-popup" id="install-popup" hidden><button id="close-install" type="button">✕</button><strong>G23f-Insider installieren</strong><p id="install-help">Öffne das Browsermenü und wähle „App installieren“ oder „Zum Startbildschirm hinzufügen“.</p></div>
+  <div class="install-popup" id="install-popup" hidden><button id="close-install" type="button">✕</button><strong>G23f-Insider als App installieren</strong><p id="install-help">Öffne das Browsermenü und wähle «App installieren».</p></div>
   <div class="welcome-modal" id="welcome-modal" hidden>
     <section class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
       <div class="onboarding-top">
@@ -160,7 +161,7 @@
       <div class="welcome-icon" id="onboarding-icon" aria-hidden="true">👋</div>
       <p class="eyebrow" id="onboarding-kicker">Willkomme</p>
       <h2 id="welcome-title">Härzlech wellkomme bi G23f-Insider!</h2>
-      <p id="onboarding-copy">Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. D Bestätigungsmail cha chli später cho, lueg falls nötig au im Spam-Ordner.</p>
+      <p id="onboarding-copy">Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. Wichtig, d Bestätigungsmail landet hüfig im Spam-Ordner.</p>
       <div class="onboarding-dots" id="onboarding-dots" aria-hidden="true"></div>
       <div class="onboarding-actions">
         <button class="secondary-onboarding-btn" id="onboarding-back-btn" type="button" hidden>Zurück</button>

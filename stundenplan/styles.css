@@ -555,6 +555,18 @@ textarea:focus {
 .calendar-surface {
   min-width: 0;
   padding: .8rem;
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+}
+
+.calendar-swipe-help {
+  margin: 0;
+  padding: .55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(240, 235, 227, .62);
+  color: var(--muted);
+  font-size: .68rem;
+  text-align: center;
 }
 
 .calendar-surface.switching {

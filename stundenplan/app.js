@@ -17,7 +17,8 @@ const COLLECTIONS = {
   members: "members",
   handles: "handles",
   tickets: "registrationTickets",
-  reports: "reports"
+  reports: "reports",
+  blocks: "accountBlocks"
 };
 
 const FALLBACK_SUBJECTS = [
@@ -53,6 +54,7 @@ let authFlowBusy = false;
 let sessionRun = 0;
 let migrationStarted = false;
 let toastTimer = null;
+let ignoreCalendarClickUntil = 0;
 
 const entryUnsubscribers = [];
 let reportsUnsubscribe = null;
@@ -367,14 +369,14 @@ async function ensureAdminIdentity(profile) {
   return { ...profile, nickname, nicknameKey };
 }
 
-async function loadSession(user) {
+async function loadSession(user, preloadedSession = null) {
   const run = ++sessionRun;
   showLoading("Konto wird geladen …");
   currentUser = user;
 
   try {
-    let memberData = null;
-    if (!isAdmin()) {
+    let memberData = preloadedSession?.member || null;
+    if (!isAdmin() && !preloadedSession) {
       const memberSnapshot = await getDoc(doc(db, COLLECTIONS.members, user.uid));
       if (!memberSnapshot.exists()) {
         location.replace(`../?mode=join&returnTo=${encodeURIComponent(location.pathname + location.search)}`);
@@ -388,7 +390,9 @@ async function loadSession(user) {
       }
     }
 
-    currentProfile = await loadOwnProfile(user, memberData);
+    currentProfile = preloadedSession?.profileExists
+      ? preloadedSession.profile
+      : await loadOwnProfile(user, memberData);
     if (isAdmin()) currentProfile = await ensureAdminIdentity(currentProfile);
     if (run !== sessionRun) return;
     await Promise.all([loadSubjects(), loadAllUsers()]);
@@ -1446,7 +1450,11 @@ async function blockUser(uid, name) {
   if (!isAdmin() || uid === currentUser.uid) return;
   if (!confirm(`${name} wirklich sperren? Die Person kann danach keine Klassendaten mehr öffnen.`)) return;
   try {
-    await updateDoc(doc(db, COLLECTIONS.members, uid), { blocked: true, blockedAt: serverTimestamp(), blockedByUid: currentUser.uid });
+    await setDoc(doc(db, COLLECTIONS.blocks, uid), {
+      blocked: true,
+      createdAt: serverTimestamp(),
+      createdByUid: currentUser.uid
+    });
     closeModal("profile-modal");
     toast(`🚫 ${name} wurde gesperrt`);
   } catch {
@@ -1589,6 +1597,7 @@ $("desktop-add-btn").addEventListener("click", openAddEntry);
 $("mobile-add-btn").addEventListener("click", openAddEntry);
 
 function handleCalendarClick(event) {
+  if (Date.now() < ignoreCalendarClickUntil) return;
   const entryButton = event.target.closest("[data-entry-id]");
   if (entryButton) return openEntryDetail(decodeId(entryButton.dataset.entryId));
   const dateButton = event.target.closest("[data-calendar-date]");
@@ -1599,6 +1608,46 @@ function handleCalendarClick(event) {
 
 $("calendar-surface").addEventListener("click", handleCalendarClick);
 $("agenda-list").addEventListener("click", handleCalendarClick);
+
+let calendarTouchStartX = 0;
+let calendarTouchStartY = 0;
+let calendarTouchActive = false;
+const calendarSurface = $("calendar-surface");
+
+calendarSurface.addEventListener("touchstart", event => {
+  if (event.touches.length !== 1) return;
+  calendarTouchStartX = event.touches[0].clientX;
+  calendarTouchStartY = event.touches[0].clientY;
+  calendarTouchActive = true;
+}, { passive: true });
+
+calendarSurface.addEventListener("touchend", event => {
+  if (!calendarTouchActive || event.changedTouches.length !== 1) return;
+  calendarTouchActive = false;
+  const deltaX = event.changedTouches[0].clientX - calendarTouchStartX;
+  const deltaY = event.changedTouches[0].clientY - calendarTouchStartY;
+  if (Math.abs(deltaX) < 55 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.3) return;
+  ignoreCalendarClickUntil = Date.now() + 450;
+  navigatePeriod(deltaX < 0 ? 1 : -1);
+}, { passive: true });
+
+calendarSurface.addEventListener("touchcancel", () => { calendarTouchActive = false; }, { passive: true });
+
+let wheelDistance = 0;
+let wheelResetTimer = null;
+let lastWheelNavigation = 0;
+calendarSurface.addEventListener("wheel", event => {
+  if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) * 1.35 || Math.abs(event.deltaX) < 2) return;
+  event.preventDefault();
+  clearTimeout(wheelResetTimer);
+  wheelDistance += event.deltaX;
+  wheelResetTimer = setTimeout(() => { wheelDistance = 0; }, 180);
+  if (Math.abs(wheelDistance) < 70 || Date.now() - lastWheelNavigation < 450) return;
+  lastWheelNavigation = Date.now();
+  ignoreCalendarClickUntil = Date.now() + 450;
+  navigatePeriod(wheelDistance > 0 ? 1 : -1);
+  wheelDistance = 0;
+}, { passive: false });
 
 $("calendar-surface").addEventListener("keydown", event => {
   if (!['Enter', ' '].includes(event.key) || event.target.closest("[data-entry-id]")) return;
@@ -1692,4 +1741,4 @@ $("reports-list").addEventListener("click", event => {
 });
 
 const protectedSession = await requireClassSession("../");
-if (protectedSession) await loadSession(protectedSession.user);
+if (protectedSession) await loadSession(protectedSession.user, protectedSession);
