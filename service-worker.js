@@ -1,9 +1,9 @@
-const CACHE_NAME = "g23f-insider-v8-2026-08-21";
+const CACHE_NAME = "g23f-insider-v11-2026-08-21";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
+  "./styles.css?v=2026-08-21-3",
+  "./app.js?v=2026-08-21-3",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -22,8 +22,8 @@ const APP_SHELL = [
   "./faecher/app.js",
   "./faecher/faecher.json",
   "./maturareise/index.html",
-  "./maturareise/styles.css",
-  "./maturareise/app.js",
+  "./maturareise/styles.css?v=2026-08-21-2",
+  "./maturareise/app.js?v=2026-08-21-2",
   "./faecher/biologie/index.html",
   "./faecher/biologie/app.js",
   "./faecher/biologie/themen.json"

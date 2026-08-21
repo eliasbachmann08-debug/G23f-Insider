@@ -43,7 +43,7 @@ const ONBOARDING_VERSION = "v2";
 const ONBOARDING_STEPS = [
   {
     icon: "👋", kicker: "Willkomme", title: "Härzlech wellkomme bi G23f-Insider!",
-    copy: "Do hesch de Stondeplan, Lernapps, dini private Notes ond d Planung vo de Maturareis a eim Ort. Wichtig, d Bestätigungsmail landet hüfig im Spam-Ordner."
+    copy: "Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. Wechtig, s Bestätigungsmail landet wahrschinlech im Spam-Ordner."
   },
   {
     icon: "🧭", kicker: "Direkt loslege", title: "Vier wichtige Bereiche",
@@ -130,10 +130,11 @@ function hideLoading() {
   $("loading-layer").hidden = true;
 }
 
-function setError(id, message = "") {
+function setError(id, message = "", tone = "error") {
   const element = $(id);
   element.textContent = message;
   element.classList.toggle("visible", Boolean(message));
+  element.classList.toggle("success", Boolean(message) && tone === "success");
 }
 
 function setBusy(button, busy, busyText = "Bitte warten …") {
@@ -455,12 +456,27 @@ async function handleJoin(event) {
   } finally { hideLoading(); setBusy(button, false); }
 }
 
-async function forgotPassword() {
-  const email = $("login-email").value.trim().toLowerCase();
+async function forgotPassword(event) {
+  event?.preventDefault();
+  const emailInput = $("login-email");
+  const email = emailInput.value.trim().toLowerCase();
+  const button = $("forgot-password-btn");
   setError("login-error", "");
-  if (!email) return setError("login-error", "Gib zuerst deine E-Mail-Adresse ein.");
-  try { await sendPasswordResetEmail(auth, email); toast("✓ E-Mail zum Zurücksetzen wurde gesendet"); }
-  catch (error) { setError("login-error", authMessage(error)); }
+  if (!email) {
+    setError("login-error", "Gib zuerst oben deine E-Mail-Adresse ein.");
+    emailInput.focus();
+    return;
+  }
+  setBusy(button, true, "Mail wird gesendet …");
+  setError("login-error", "Die E-Mail wird vorbereitet …", "success");
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setError("login-error", "Falls für diese E-Mail ein Konto besteht, wurde eine Mail zum Zurücksetzen gesendet. Prüfe auch den SPAM-ORDNER.", "success");
+  } catch (error) {
+    setError("login-error", authMessage(error));
+  } finally {
+    setBusy(button, false);
+  }
 }
 
 function stopDataListeners() {
@@ -594,6 +610,11 @@ $("login-form").addEventListener("submit", handleLogin);
 $("register-form").addEventListener("submit", handleRegistration);
 $("join-form").addEventListener("submit", handleJoin);
 $("forgot-password-btn").addEventListener("click", forgotPassword);
+$("forgot-password-btn").dataset.ready = "true";
+if (window.g23fForgotPasswordQueued) {
+  window.g23fForgotPasswordQueued = false;
+  forgotPassword();
+}
 $("show-register-btn").addEventListener("click", () => showAuth("register"));
 $("show-login-btn").addEventListener("click", () => showAuth("login"));
 $("join-logout-btn").addEventListener("click", async () => { await signOut(auth); showAuth("login"); });

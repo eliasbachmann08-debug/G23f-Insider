@@ -17,11 +17,11 @@
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="app.js?v=2026-08-21-3">
   <link rel="modulepreload" href="shared/firebase.js">
   <link rel="modulepreload" href="shared/shell.js">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2026-08-21-3">
   <link rel="stylesheet" href="shared/shell.css">
 </head>
 <body>
@@ -51,7 +51,7 @@
           <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" required>
           <p class="form-error" id="login-error" role="alert"></p>
           <button class="primary-btn" id="login-submit" type="submit">Anmelden →</button>
-          <button class="text-btn" id="forgot-password-btn" type="button">Passwort vergessen?</button>
+          <button class="forgot-password-btn" id="forgot-password-btn" type="button">Passwort vergessen?</button>
           <div class="register-callout">
             <strong>Noch kein Konto?</strong>
             <span>Dann musst du dich zuerst mit dem Klassenpasswort registrieren.</span>
@@ -180,7 +180,15 @@
         document.getElementById("loading-layer").hidden = false;
       }
     } catch {}
+    const earlyForgotButton = document.getElementById("forgot-password-btn");
+    earlyForgotButton.addEventListener("click", () => {
+      if (earlyForgotButton.dataset.ready === "true") return;
+      window.g23fForgotPasswordQueued = true;
+      const status = document.getElementById("login-error");
+      status.textContent = "Die Passwortfunktion wird geladen. Danach wird die Mail direkt vorbereitet …";
+      status.classList.add("visible", "success");
+    });
   </script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2026-08-21-3"></script>
 </body>
 </html>

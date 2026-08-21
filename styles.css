@@ -73,5 +73,33 @@ body.welcome-open{overflow:hidden}
   background: #fff0f4;
   color: #7e3046;
 }
+.forgot-password-btn {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 42px;
+  margin-top: .1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f2eb;
+  color: #715b43;
+  cursor: pointer;
+  font-size: .76rem;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.forgot-password-btn:hover {
+  border-color: var(--accent);
+  background: #efe6da;
+}
+.forgot-password-btn:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+.form-error.success {
+  border-color: rgba(47, 122, 67, .24);
+  background: #edf8f0;
+  color: #2f7a43;
+}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .compact-main{color:var(--text);text-decoration:none}

@@ -15,11 +15,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="app.js?v=2026-08-21-2">
   <link rel="modulepreload" href="../shared/session.js">
   <link rel="modulepreload" href="../shared/shell.js">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2026-08-21-2">
   <link rel="stylesheet" href="../shared/shell.css">
 </head>
 <body>
@@ -54,14 +54,28 @@
           <p class="eyebrow">Gemeinsames Blatt</p>
           <h2 id="board-title">Planung</h2>
         </div>
-        <p><strong id="card-count">0 Beiträge</strong><span> Ziehe deine Beiträge an die gewünschte Stelle. Mit einem Doppelklick auf eine freie Stelle erstellst du dort einen neuen.</span></p>
+        <p><strong id="card-count">Beiträge werden geladen …</strong><span> Eigene Beiträge kannst du verschieben. Mit einem Doppelklick auf eine freie Stelle erstellst du dort einen neuen.</span></p>
       </div>
-      <div class="board-viewport" id="board-viewport">
-        <div class="trip-board" id="trip-board" aria-live="polite">
-          <div class="board-empty" id="board-empty">
-            <span>📄</span>
-            <strong>Noch ist das Blatt leer.</strong>
-            <p>Füge den ersten Gedanken zur Maturareise hinzu.</p>
+      <div class="board-navigation">
+        <p>Verschiebe die Fläche mit einem Finger. Zoome mit zwei Fingern oder den Knöpfen.</p>
+        <div class="board-navigation-actions">
+          <span class="board-save-status" id="board-save-status" role="status">Beiträge werden geladen …</span>
+          <div class="board-zoom-controls" role="group" aria-label="Zoom der Leinwand">
+            <button id="zoom-out-btn" type="button" aria-label="Herauszoomen">−</button>
+            <button class="zoom-value" id="zoom-reset-btn" type="button" aria-label="Zoom auf 100 Prozent setzen"><span id="zoom-value">100 %</span></button>
+            <button id="zoom-in-btn" type="button" aria-label="Hineinzoomen">＋</button>
+            <button class="zoom-fit" id="zoom-fit-btn" type="button">Alle Beiträge</button>
+          </div>
+        </div>
+      </div>
+      <div class="board-viewport" id="board-viewport" tabindex="0" aria-label="Zoombare Leinwand für die Maturareise">
+        <div class="board-stage" id="board-stage">
+          <div class="trip-board" id="trip-board" aria-live="polite">
+            <div class="board-empty" id="board-empty">
+              <span>📄</span>
+              <strong id="board-empty-title">Beiträge werden geladen …</strong>
+              <p id="board-empty-copy">Deine gespeicherten Inhalte erscheinen gleich.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -101,6 +115,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="loading-layer" id="loading-layer"><div class="spinner"></div><span>Klassenkonto wird geladen …</span></div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2026-08-21-2"></script>
 </body>
 </html>
