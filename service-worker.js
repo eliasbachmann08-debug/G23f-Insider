@@ -1,4 +1,4 @@
-const CACHE_NAME = "g23f-insider-v16-2026-08-30";
+const CACHE_NAME = "g23f-insider-v18-2026-08-30";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,7 +8,7 @@ const APP_SHELL = [
   "./icon-192.png",
   "./icon-512.png",
   "./stundenplan/index.html",
-  "./stundenplan/styles.css?v=2026-08-30-4",
+  "./stundenplan/styles.css?v=2026-08-30-6",
   "./stundenplan/app.js?v=2026-08-30-2",
   "./notes/index.html",
   "./notes/styles.css",

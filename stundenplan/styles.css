@@ -689,22 +689,21 @@ textarea:focus {
 }
 
 .range-event.continues-before {
-  margin-left: 0;
-  border-left: 0;
-  border-radius: 2px 9px 9px 2px;
+  margin-left: .55rem;
+  border-radius: 9px;
 }
 
 .range-event.continues-after {
-  margin-right: 0;
-  border-right: 0;
-  border-radius: 9px 2px 2px 9px;
+  margin-right: .55rem;
+  border-radius: 9px;
 }
 
 .range-event.continues-before.continues-after {
-  border-radius: 2px;
+  border-radius: 9px;
 }
 
 .range-event-title {
+  display: block;
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -924,7 +923,7 @@ textarea:focus {
 
 .month-range-space {
   display: block;
-  height: calc(var(--range-rows) * 31px);
+  height: calc(var(--range-rows) * 22px);
 }
 
 .month-range-layer {
@@ -934,46 +933,74 @@ textarea:focus {
   top: 38px;
   right: 0;
   left: 0;
-  grid-template-rows: repeat(var(--range-rows), 26px);
-  gap: 5px var(--calendar-gap);
+  grid-template-rows: repeat(var(--range-rows), 18px);
+  gap: 4px var(--calendar-gap);
 }
 
 .month-range-layer .range-event {
+  height: 18px;
   margin-right: .28rem;
   margin-left: .28rem;
-  padding-right: .4rem;
-  padding-left: .85rem;
-  border-radius: 7px;
+  padding: .195rem .28rem;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  box-shadow: none;
+}
+
+.month-range-layer .range-event::before {
+  display: none;
+}
+
+.month-range-layer .range-event.hausaufgabe {
+  background: var(--homework);
+}
+
+.month-range-layer .range-event.test {
+  background: var(--test);
+}
+
+.month-range-layer .range-event.organisatorisch {
+  background: var(--org);
 }
 
 .month-range-layer .range-event.continues-before {
-  margin-left: 0;
-  border-radius: 2px 7px 7px 2px;
+  margin-left: .28rem;
+  border-radius: 4px;
 }
 
 .month-range-layer .range-event.continues-after {
-  margin-right: 0;
-  border-radius: 7px 2px 2px 7px;
+  margin-right: .28rem;
+  border-radius: 4px;
 }
 
 .month-range-layer .range-event.continues-before.continues-after {
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .month-range-layer .range-event-title {
-  font-size: .56rem;
+  font-size: .61rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .month-events {
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   gap: .2rem;
 }
 
 .month-event {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  height: 18px;
   overflow: hidden;
-  padding: .18rem .28rem;
+  padding: .195rem .28rem;
   border-radius: 4px;
   color: #fff;
   text-overflow: ellipsis;
@@ -1850,34 +1877,55 @@ textarea:focus {
   .week-range-layer {
     --calendar-gap: 2px;
     top: 42px;
-    grid-template-rows: repeat(var(--range-rows), 26px);
-    gap: 4px var(--calendar-gap);
+    grid-template-rows: repeat(var(--range-rows), 14px);
+    gap: 2px var(--calendar-gap);
   }
 
   .week-range-layer .range-event {
-    margin-right: 3px;
-    margin-left: 3px;
-    padding-right: .3rem;
-    padding-left: .7rem;
-    border-radius: 6px;
+    height: 14px;
+    margin-right: 2px;
+    margin-left: 2px;
+    padding: .167rem .1rem;
+    border: 0;
+    border-radius: 3px;
+    color: #fff;
+    box-shadow: none;
+  }
+
+  .week-range-layer .range-event::before {
+    display: none;
+  }
+
+  .week-range-layer .range-event.hausaufgabe {
+    background: var(--homework);
+  }
+
+  .week-range-layer .range-event.test {
+    background: var(--test);
+  }
+
+  .week-range-layer .range-event.organisatorisch {
+    background: var(--org);
   }
 
   .week-range-layer .range-event.continues-before {
-    margin-left: 0;
-    border-radius: 2px 6px 6px 2px;
+    margin-left: 2px;
+    border-radius: 3px;
   }
 
   .week-range-layer .range-event.continues-after {
-    margin-right: 0;
-    border-radius: 6px 2px 2px 6px;
+    margin-right: 2px;
+    border-radius: 3px;
   }
 
   .week-range-layer .range-event.continues-before.continues-after {
-    border-radius: 2px;
+    border-radius: 3px;
   }
 
   .week-range-layer .range-event-title {
-    font-size: .52rem;
+    font-size: .47rem;
+    font-weight: 700;
+    line-height: 1.15;
   }
 
   .strip-day {
@@ -1924,7 +1972,7 @@ textarea:focus {
 
   .strip-range-space {
     width: 100%;
-    min-height: calc(var(--range-rows) * 30px);
+    min-height: calc(var(--range-rows) * 16px);
     display: block;
     flex: 0 0 auto;
   }
@@ -1941,8 +1989,9 @@ textarea:focus {
   .strip-event {
     width: 100%;
     min-width: 0;
+    height: 14px;
     overflow: hidden;
-    padding: .13rem .1rem;
+    padding: .167rem .1rem;
     border-radius: 3px;
     color: #fff;
     text-overflow: ellipsis;
@@ -1996,49 +2045,47 @@ textarea:focus {
   }
 
   .month-range-space {
-    height: calc(var(--range-rows) * 23px);
+    height: calc(var(--range-rows) * 16px);
   }
 
   .month-range-layer {
     --calendar-gap: 2px;
     top: 33px;
-    grid-template-rows: repeat(var(--range-rows), 20px);
-    gap: 3px var(--calendar-gap);
+    grid-template-rows: repeat(var(--range-rows), 14px);
+    gap: 2px var(--calendar-gap);
   }
 
   .month-range-layer .range-event {
+    height: 14px;
     margin-right: 2px;
     margin-left: 2px;
-    padding-right: .2rem;
-    padding-left: .5rem;
+    padding: .17rem .15rem;
     border-radius: 4px;
     box-shadow: none;
   }
 
   .month-range-layer .range-event.continues-before {
-    margin-left: 0;
-    border-radius: 1px 4px 4px 1px;
+    margin-left: 2px;
+    border-radius: 4px;
   }
 
   .month-range-layer .range-event.continues-after {
-    margin-right: 0;
-    border-radius: 4px 1px 1px 4px;
+    margin-right: 2px;
+    border-radius: 4px;
   }
 
   .month-range-layer .range-event.continues-before.continues-after {
-    border-radius: 1px;
+    border-radius: 4px;
   }
 
   .month-range-layer .range-event-title {
-    font-size: .45rem;
+    font-size: .47rem;
+    line-height: 1.12;
   }
 
   .month-range-layer .range-event::before,
   .week-range-layer .range-event::before {
-    top: .3rem;
-    bottom: .3rem;
-    left: .25rem;
-    width: 2px;
+    display: none;
   }
 
   .month-day.today .month-number {
@@ -2054,7 +2101,8 @@ textarea:focus {
   }
 
   .month-event {
-    padding: .12rem .15rem;
+    height: 14px;
+    padding: .17rem .15rem;
     font-size: .47rem;
     line-height: 1.12;
   }
