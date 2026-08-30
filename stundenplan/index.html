@@ -3,21 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Stundenplan | G23f-Insider</title>
+  <title>Stundenplan – G23f-Insider</title>
   <meta name="theme-color" content="#F5F1EA">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="icon" href="../icon-192.png">
-  <link rel="apple-touch-icon" href="../icon-192.png">
   <link rel="manifest" href="../manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="modulepreload" href="app.js">
-  <link rel="modulepreload" href="../shared/session.js">
-  <link rel="modulepreload" href="../shared/shell.js">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="../shared/shell.css">
@@ -116,7 +107,7 @@
             <div class="period-nav">
               <button class="nav-btn" id="previous-period-btn" type="button" aria-label="Vorheriger Zeitraum">‹</button>
               <button class="today-btn" id="today-btn" type="button">Heute</button>
-              <strong class="period-label" id="period-label">Lädt</strong>
+              <strong class="period-label" id="period-label">–</strong>
               <button class="nav-btn" id="next-period-btn" type="button" aria-label="Nächster Zeitraum">›</button>
             </div>
             <div class="calendar-controls">
@@ -137,13 +128,11 @@
             </div>
           </div>
 
-          <p class="calendar-swipe-help">↔ Seitlich wischen oder scrollen für eine andere Woche oder einen anderen Monat.</p>
-
           <section class="agenda" id="agenda-section" hidden>
             <div class="agenda-heading">
               <div>
                 <p class="eyebrow">Ausgewählter Tag</p>
-                <h2 id="agenda-date">Datum</h2>
+                <h2 id="agenda-date">–</h2>
                 <p class="agenda-help">Tippe auf einen Eintrag für genauere Infos.</p>
               </div>
               <span class="agenda-count" id="agenda-count">0 Einträge</span>
@@ -197,7 +186,7 @@
 
         <div class="form-row">
           <label for="entry-topic" id="entry-topic-label">Auftrag / Thema</label>
-          <textarea id="entry-topic" rows="2" maxlength="500" placeholder="z. B. Seiten 45 bis 52 lesen" required></textarea>
+          <textarea id="entry-topic" rows="2" maxlength="500" placeholder="z. B. Seiten 45–52 lesen" required></textarea>
         </div>
 
         <div class="form-row">

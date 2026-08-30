@@ -1,9 +1,9 @@
-const CACHE_NAME = "g23f-insider-v11-2026-08-21";
+const CACHE_NAME = "g23f-insider-v5-2026-08-10";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=2026-08-21-3",
-  "./app.js?v=2026-08-21-3",
+  "./styles.css",
+  "./app.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -17,13 +17,7 @@ const APP_SHELL = [
   "./shared/session.js",
   "./shared/shell.css",
   "./shared/shell.js",
-  "./faecher/index.html",
-  "./faecher/styles.css",
-  "./faecher/app.js",
   "./faecher/faecher.json",
-  "./maturareise/index.html",
-  "./maturareise/styles.css?v=2026-08-21-2",
-  "./maturareise/app.js?v=2026-08-21-2",
   "./faecher/biologie/index.html",
   "./faecher/biologie/app.js",
   "./faecher/biologie/themen.json"
@@ -53,29 +47,15 @@ self.addEventListener("fetch", event => {
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request).then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      }).catch(async () => (await caches.match(event.request)) || caches.match("./index.html"))
-    );
-    return;
-  }
-
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
+    fetch(event.request)
+      .then(response => {
         if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
         }
         return response;
-      });
-    }).catch(() => caches.match("./index.html"))
+      })
+      .catch(() => caches.match(event.request).then(cached => cached || caches.match("./index.html")))
   );
 });

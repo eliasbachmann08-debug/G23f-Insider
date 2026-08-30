@@ -555,18 +555,6 @@ textarea:focus {
 .calendar-surface {
   min-width: 0;
   padding: .8rem;
-  touch-action: pan-y;
-  overscroll-behavior-x: contain;
-}
-
-.calendar-swipe-help {
-  margin: 0;
-  padding: .55rem 1rem;
-  border-bottom: 1px solid var(--border);
-  background: rgba(240, 235, 227, .62);
-  color: var(--muted);
-  font-size: .68rem;
-  text-align: center;
 }
 
 .calendar-surface.switching {
@@ -1488,27 +1476,26 @@ textarea:focus {
 
 .toast {
   position: fixed;
-  right: 1rem;
-  top: max(4.8rem, calc(env(safe-area-inset-top) + 4.8rem));
-  z-index: 1600;
-  width: max-content;
-  max-width: min(390px, calc(100% - 2rem));
+  left: 50%;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 900;
+  max-width: calc(100% - 2rem);
   padding: .7rem 1rem;
-  border-radius: 12px;
+  border-radius: 999px;
   background: var(--text);
   color: #fff;
   box-shadow: var(--shadow);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-12px);
+  transform: translate(-50%, 15px);
   transition: opacity .2s, transform .2s;
   font-size: .76rem;
-  text-align: left;
+  text-align: center;
 }
 
 .toast.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translate(-50%, 0);
 }
 
 .loading-layer {
@@ -1677,7 +1664,7 @@ textarea:focus {
 
   .strip-day {
     min-width: 0;
-    min-height: 100px;
+    min-height: 76px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1717,34 +1704,10 @@ textarea:focus {
     font-weight: 800;
   }
 
-  .strip-events {
-    width: 100%;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  .strip-day .event-bars {
+    width: calc(100% - 4px);
     margin-top: auto;
   }
-
-  .strip-event {
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    padding: .13rem .1rem;
-    border-radius: 3px;
-    color: #fff;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: .47rem;
-    font-weight: 700;
-    line-height: 1.15;
-    text-align: left;
-  }
-
-  .strip-event.hausaufgabe { background: var(--homework); }
-  .strip-event.test { background: var(--test); }
-  .strip-event.organisatorisch { background: var(--org); }
-  .strip-more { color: var(--muted); font-size: .48rem; font-weight: 700; }
 
   .month-grid {
     gap: 2px;
@@ -1760,7 +1723,7 @@ textarea:focus {
   }
 
   .month-day {
-    min-height: 80px;
+    min-height: 62px;
     padding: .28rem .2rem;
     border-radius: 6px;
   }
@@ -1779,21 +1742,12 @@ textarea:focus {
   }
 
   .month-events {
-    display: flex;
-    gap: 2px;
+    display: none;
   }
-
-  .month-event {
-    padding: .12rem .15rem;
-    font-size: .47rem;
-    line-height: 1.12;
-  }
-
-  .month-event:nth-child(n+3) { display: none; }
-  .month-more { font-size: .48rem; }
 
   .month-day > .event-bars {
-    display: none;
+    display: flex;
+    padding: 0 1px;
   }
 
   .agenda {
@@ -1887,9 +1841,7 @@ textarea:focus {
   }
 
   .toast {
-    right: .7rem;
-    top: max(4.4rem, calc(env(safe-area-inset-top) + 4.4rem));
-    max-width: calc(100% - 1.4rem);
+    bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 64px);
   }
 }
 
