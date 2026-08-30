@@ -1,4 +1,4 @@
-const CACHE_NAME = "g23f-insider-v15-2026-08-30";
+const CACHE_NAME = "g23f-insider-v16-2026-08-30";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,8 +8,8 @@ const APP_SHELL = [
   "./icon-192.png",
   "./icon-512.png",
   "./stundenplan/index.html",
-  "./stundenplan/styles.css?v=2026-08-30-3",
-  "./stundenplan/app.js?v=2026-08-30-1",
+  "./stundenplan/styles.css?v=2026-08-30-4",
+  "./stundenplan/app.js?v=2026-08-30-2",
   "./notes/index.html",
   "./notes/styles.css",
   "./notes/app.js",
@@ -33,7 +33,6 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -67,7 +66,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (event.request.destination === "style" || event.request.destination === "script") {
+  if (requestUrl.pathname.startsWith("/stundenplan/") &&
+      (event.request.destination === "style" || event.request.destination === "script")) {
     event.respondWith(
       fetch(event.request, { cache: "no-cache" }).then(response => {
         if (response.ok) {
