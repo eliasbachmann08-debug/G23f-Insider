@@ -619,8 +619,8 @@ textarea:focus {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: repeat(var(--range-rows), 25px);
-  gap: 4px var(--calendar-gap);
+  grid-template-rows: repeat(var(--range-rows), 34px);
+  gap: 7px var(--calendar-gap);
   pointer-events: none;
 }
 
@@ -628,14 +628,15 @@ textarea:focus {
   --calendar-gap: .55rem;
   position: absolute;
   z-index: 4;
-  top: 48px;
+  top: 58px;
   right: 0;
   left: 0;
-  grid-template-rows: repeat(var(--range-rows), 25px);
-  gap: 4px var(--calendar-gap);
+  grid-template-rows: repeat(var(--range-rows), 34px);
+  gap: 7px var(--calendar-gap);
 }
 
 .range-event {
+  --range-accent: var(--org);
   position: relative;
   z-index: 2;
   grid-column: var(--range-column) / span var(--range-span);
@@ -644,33 +645,59 @@ textarea:focus {
   height: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   overflow: hidden;
-  margin: 0 2px;
-  padding: 0 .55rem;
-  border: 1px solid rgba(255, 255, 255, .35);
-  border-radius: 7px;
-  color: #fff;
-  box-shadow: 0 2px 7px rgba(45, 36, 27, .13);
+  margin: 0 .55rem;
+  padding: 0 .7rem 0 1.05rem;
+  border: 1px solid rgba(52, 125, 147, .16);
+  border-radius: 9px;
+  background: var(--org-bg);
+  color: var(--text);
+  box-shadow: 0 2px 7px rgba(45, 36, 27, .06);
   cursor: pointer;
   text-align: left;
   pointer-events: auto;
 }
 
-.range-event.hausaufgabe { background: var(--homework); }
-.range-event.test { background: var(--test); }
-.range-event.organisatorisch { background: var(--org); }
+.range-event::before {
+  content: "";
+  position: absolute;
+  top: .38rem;
+  bottom: .38rem;
+  left: .38rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--range-accent);
+}
+
+.range-event.hausaufgabe {
+  --range-accent: var(--homework);
+  border-color: rgba(191, 122, 18, .16);
+  background: var(--homework-bg);
+}
+
+.range-event.test {
+  --range-accent: var(--test);
+  border-color: rgba(184, 73, 103, .16);
+  background: var(--test-bg);
+}
+
+.range-event.organisatorisch {
+  --range-accent: var(--org);
+  border-color: rgba(52, 125, 147, .16);
+  background: var(--org-bg);
+}
 
 .range-event.continues-before {
   margin-left: 0;
   border-left: 0;
-  border-radius: 2px 7px 7px 2px;
+  border-radius: 2px 9px 9px 2px;
 }
 
 .range-event.continues-after {
   margin-right: 0;
   border-right: 0;
-  border-radius: 7px 2px 2px 7px;
+  border-radius: 9px 2px 2px 9px;
 }
 
 .range-event.continues-before.continues-after {
@@ -687,7 +714,7 @@ textarea:focus {
   font-size: .66rem;
   font-weight: 700;
   line-height: 1;
-  text-align: center;
+  text-align: left;
 }
 
 .week-day {
@@ -729,7 +756,7 @@ textarea:focus {
 
 .week-range-space {
   display: block;
-  height: calc(var(--range-rows) * 29px + var(--range-space-after, 0px));
+  height: calc(var(--range-rows) * 41px + var(--range-space-after, 0px));
 }
 
 .day-header strong {
@@ -851,6 +878,9 @@ textarea:focus {
 .month-day {
   min-width: 0;
   min-height: 112px;
+  display: grid;
+  grid-template-rows: 32px auto minmax(0, 1fr);
+  align-content: start;
   overflow: hidden;
   padding: .4rem;
   border: 1px solid var(--border);
@@ -880,9 +910,13 @@ textarea:focus {
 }
 
 .month-number {
+  position: relative;
+  z-index: 5;
+  align-self: start;
   display: block;
+  height: 24px;
   min-height: 24px;
-  margin: 0 0 .35rem;
+  margin: 0;
   font-size: .76rem;
   font-weight: 700;
   line-height: 24px;
@@ -890,36 +924,36 @@ textarea:focus {
 
 .month-range-space {
   display: block;
-  height: calc(var(--range-rows) * 22px);
+  height: calc(var(--range-rows) * 31px);
 }
 
 .month-range-layer {
   --calendar-gap: .35rem;
   position: absolute;
   z-index: 4;
-  top: 36px;
+  top: 38px;
   right: 0;
   left: 0;
-  grid-template-rows: repeat(var(--range-rows), 18px);
-  gap: 4px var(--calendar-gap);
+  grid-template-rows: repeat(var(--range-rows), 26px);
+  gap: 5px var(--calendar-gap);
 }
 
 .month-range-layer .range-event {
-  margin-right: 2px;
-  margin-left: 2px;
-  padding-right: .35rem;
-  padding-left: .35rem;
-  border-radius: 5px;
+  margin-right: .28rem;
+  margin-left: .28rem;
+  padding-right: .4rem;
+  padding-left: .85rem;
+  border-radius: 7px;
 }
 
 .month-range-layer .range-event.continues-before {
   margin-left: 0;
-  border-radius: 2px 5px 5px 2px;
+  border-radius: 2px 7px 7px 2px;
 }
 
 .month-range-layer .range-event.continues-after {
   margin-right: 0;
-  border-radius: 5px 2px 2px 5px;
+  border-radius: 7px 2px 2px 7px;
 }
 
 .month-range-layer .range-event.continues-before.continues-after {
@@ -1815,27 +1849,27 @@ textarea:focus {
 
   .week-range-layer {
     --calendar-gap: 2px;
-    top: 36px;
-    grid-template-rows: repeat(var(--range-rows), 19px);
-    gap: 2px var(--calendar-gap);
+    top: 42px;
+    grid-template-rows: repeat(var(--range-rows), 26px);
+    gap: 4px var(--calendar-gap);
   }
 
   .week-range-layer .range-event {
-    margin-right: 1px;
-    margin-left: 1px;
-    padding-right: .25rem;
-    padding-left: .25rem;
-    border-radius: 4px;
+    margin-right: 3px;
+    margin-left: 3px;
+    padding-right: .3rem;
+    padding-left: .7rem;
+    border-radius: 6px;
   }
 
   .week-range-layer .range-event.continues-before {
     margin-left: 0;
-    border-radius: 2px 4px 4px 2px;
+    border-radius: 2px 6px 6px 2px;
   }
 
   .week-range-layer .range-event.continues-after {
     margin-right: 0;
-    border-radius: 4px 2px 2px 4px;
+    border-radius: 6px 2px 2px 6px;
   }
 
   .week-range-layer .range-event.continues-before.continues-after {
@@ -1843,7 +1877,7 @@ textarea:focus {
   }
 
   .week-range-layer .range-event-title {
-    font-size: .48rem;
+    font-size: .52rem;
   }
 
   .strip-day {
@@ -1890,7 +1924,7 @@ textarea:focus {
 
   .strip-range-space {
     width: 100%;
-    min-height: calc(var(--range-rows) * 21px);
+    min-height: calc(var(--range-rows) * 30px);
     display: block;
     flex: 0 0 auto;
   }
@@ -1947,47 +1981,48 @@ textarea:focus {
 
   .month-day {
     min-height: 80px;
+    grid-template-rows: 28px auto minmax(0, 1fr);
     padding: .28rem .2rem;
     border-radius: 6px;
   }
 
   .month-number {
+    height: 21px;
     min-height: 21px;
-    margin-bottom: .25rem;
+    margin: 0;
     text-align: center;
     font-size: .69rem;
     line-height: 21px;
   }
 
   .month-range-space {
-    height: calc(var(--range-rows) * 16px);
+    height: calc(var(--range-rows) * 23px);
   }
 
   .month-range-layer {
     --calendar-gap: 2px;
-    top: 30px;
-    grid-template-rows: repeat(var(--range-rows), 14px);
-    gap: 2px var(--calendar-gap);
+    top: 33px;
+    grid-template-rows: repeat(var(--range-rows), 20px);
+    gap: 3px var(--calendar-gap);
   }
 
   .month-range-layer .range-event {
-    margin-right: 1px;
-    margin-left: 1px;
-    padding-right: .18rem;
-    padding-left: .18rem;
-    border-width: 0;
-    border-radius: 3px;
+    margin-right: 2px;
+    margin-left: 2px;
+    padding-right: .2rem;
+    padding-left: .5rem;
+    border-radius: 4px;
     box-shadow: none;
   }
 
   .month-range-layer .range-event.continues-before {
     margin-left: 0;
-    border-radius: 1px 3px 3px 1px;
+    border-radius: 1px 4px 4px 1px;
   }
 
   .month-range-layer .range-event.continues-after {
     margin-right: 0;
-    border-radius: 3px 1px 1px 3px;
+    border-radius: 4px 1px 1px 4px;
   }
 
   .month-range-layer .range-event.continues-before.continues-after {
@@ -1995,7 +2030,15 @@ textarea:focus {
   }
 
   .month-range-layer .range-event-title {
-    font-size: .43rem;
+    font-size: .45rem;
+  }
+
+  .month-range-layer .range-event::before,
+  .week-range-layer .range-event::before {
+    top: .3rem;
+    bottom: .3rem;
+    left: .25rem;
+    width: 2px;
   }
 
   .month-day.today .month-number {
