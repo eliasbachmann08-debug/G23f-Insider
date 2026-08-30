@@ -17,7 +17,8 @@ const COLLECTIONS = {
   members: "members",
   handles: "handles",
   tickets: "registrationTickets",
-  reports: "reports"
+  reports: "reports",
+  blocks: "accountBlocks"
 };
 
 const FALLBACK_SUBJECTS = [
@@ -53,6 +54,7 @@ let authFlowBusy = false;
 let sessionRun = 0;
 let migrationStarted = false;
 let toastTimer = null;
+let ignoreCalendarClickUntil = 0;
 
 const entryUnsubscribers = [];
 let reportsUnsubscribe = null;
@@ -178,6 +180,11 @@ function entryCoversDate(entry, value) {
 
 function entryTitle(entry) {
   return entry.type === "organisatorisch" ? (entry.thema || "Organisatorisches") : (entry.fach || "Ohne Fach");
+}
+
+function calendarPreviewTitle(entry) {
+  if (entry.type === "organisatorisch") return entryTitle(entry);
+  return String(entry.thema || "").trim() || entryTitle(entry);
 }
 
 function profileFor(uid) {
@@ -361,14 +368,14 @@ async function ensureAdminIdentity(profile) {
   return { ...profile, nickname, nicknameKey };
 }
 
-async function loadSession(user) {
+async function loadSession(user, preloadedSession = null) {
   const run = ++sessionRun;
   showLoading("Konto wird geladen …");
   currentUser = user;
 
   try {
-    let memberData = null;
-    if (!isAdmin()) {
+    let memberData = preloadedSession?.member || null;
+    if (!isAdmin() && !preloadedSession) {
       const memberSnapshot = await getDoc(doc(db, COLLECTIONS.members, user.uid));
       if (!memberSnapshot.exists()) {
         location.replace(`../?mode=join&returnTo=${encodeURIComponent(location.pathname + location.search)}`);
@@ -382,7 +389,9 @@ async function loadSession(user) {
       }
     }
 
-    currentProfile = await loadOwnProfile(user, memberData);
+    currentProfile = preloadedSession?.profileExists
+      ? preloadedSession.profile
+      : await loadOwnProfile(user, memberData);
     if (isAdmin()) currentProfile = await ensureAdminIdentity(currentProfile);
     if (run !== sessionRun) return;
     await Promise.all([loadSubjects(), loadAllUsers()]);
@@ -622,21 +631,94 @@ function entriesForDate(date) {
   return visibleEntries().filter(entry => entryCoversDate(entry, value));
 }
 
-function typeKind(entry) {
-  const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
-  return `${meta.icon} ${meta.short}`;
+function isMultiDayEntry(entry) {
+  return Boolean(entry.dateTo && entry.dateTo > entry.date);
 }
 
-function eventBars(list, maximum = 4) {
-  const bars = list.slice(0, maximum).map(entry => `<span class="event-bar ${escapeHTML(entry.type)}"></span>`).join("");
-  return `<div class="event-bars">${bars}</div>`;
+function singleDayEntriesForDate(date) {
+  return entriesForDate(date).filter(entry => !isMultiDayEntry(entry));
+}
+
+function calendarDayIndex(value) {
+  const date = value instanceof Date ? value : parseDate(value);
+  return Math.round(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+}
+
+function calendarDayDistance(start, end) {
+  return calendarDayIndex(end) - calendarDayIndex(start);
+}
+
+function buildRangeLayout(periodStart, periodEnd) {
+  const periodStartValue = dateString(periodStart);
+  const periodEndValue = dateString(periodEnd);
+  const laneEnds = [];
+
+  const rangeEntries = visibleEntries()
+    .filter(entry => isMultiDayEntry(entry) && entry.date <= periodEndValue && entry.dateTo >= periodStartValue)
+    .sort((first, second) => {
+      const startOrder = first.date.localeCompare(second.date);
+      if (startOrder) return startOrder;
+      const endOrder = second.dateTo.localeCompare(first.dateTo);
+      if (endOrder) return endOrder;
+      return String(first.id).localeCompare(String(second.id));
+    });
+
+  const items = rangeEntries.map(entry => {
+    const visibleStart = entry.date < periodStartValue ? periodStartValue : entry.date;
+    const visibleEnd = entry.dateTo > periodEndValue ? periodEndValue : entry.dateTo;
+    let lane = laneEnds.findIndex(lastEnd => lastEnd < visibleStart);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = visibleEnd;
+
+    return {
+      entry,
+      column: calendarDayDistance(periodStart, parseDate(visibleStart)) + 1,
+      span: calendarDayDistance(parseDate(visibleStart), parseDate(visibleEnd)) + 1,
+      row: lane + 1,
+      continuesBefore: entry.date < periodStartValue,
+      continuesAfter: entry.dateTo > periodEndValue
+    };
+  });
+
+  return { items, laneCount: laneEnds.length };
+}
+
+function typeKind(entry) {
+  const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
+  const subject = entry.type === "organisatorisch" ? "" : String(entry.fach || "").trim();
+  return subject ? `${meta.icon} ${meta.short} · ${subject}` : `${meta.icon} ${meta.short}`;
+}
+
+function rangeEventHTML(item) {
+  const { entry } = item;
+  const classes = [
+    "range-event",
+    entry.type,
+    item.continuesBefore ? "continues-before" : "",
+    item.continuesAfter ? "continues-after" : ""
+  ].filter(Boolean).join(" ");
+  const label = calendarPreviewTitle(entry);
+  const dateLabel = `${longDate(parseDate(entry.date))} bis ${longDate(parseDate(entry.dateTo))}`;
+
+  return `<button class="${escapeHTML(classes)}" type="button" data-entry-id="${safeId(entry.id)}"
+    style="--range-column:${item.column};--range-span:${item.span};--range-row:${item.row}"
+    aria-label="${escapeHTML(`${label}, ${dateLabel}`)}" title="${escapeHTML(label)}">
+    <span class="range-event-title">${escapeHTML(label)}</span>
+  </button>`;
+}
+
+function rangeLayerHTML(layout, className) {
+  if (!layout.items.length) return "";
+  return `<div class="${className}" style="--range-rows:${layout.laneCount}" aria-label="Mehrtägige Einträge">
+    ${layout.items.map(rangeEventHTML).join("")}
+  </div>`;
 }
 
 function compactEntryHTML(entry, className = "calendar-entry") {
   const completed = entry.type === "hausaufgabe" && completedEntryIds.has(entry.id);
   const label = className === "agenda-entry"
-    ? `<span class="entry-main"><span class="entry-label">${completed ? "✓ " : ""}${escapeHTML(entryTitle(entry))}</span><span class="entry-tap-hint">Antippen für genauere Infos</span></span>`
-    : `<span class="entry-label">${escapeHTML(entryTitle(entry))}</span>`;
+    ? `<span class="entry-main"><span class="entry-label">${completed ? "✓ " : ""}${escapeHTML(calendarPreviewTitle(entry))}</span><span class="entry-tap-hint">Antippen für genauere Infos</span></span>`
+    : `<span class="entry-label">${escapeHTML(calendarPreviewTitle(entry))}</span>`;
   return `<button class="${className} ${escapeHTML(entry.type)} ${completed ? "completed" : ""}" type="button" data-entry-id="${safeId(entry.id)}">
     <span class="entry-kind">${escapeHTML(typeKind(entry))}</span>
     ${label}
@@ -647,9 +729,10 @@ function compactEntryHTML(entry, className = "calendar-entry") {
 function renderWeek() {
   const monday = startOfWeek(selectedDate);
   const days = Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+  const rangeLayout = buildRangeLayout(monday, addDays(monday, 6));
 
   const desktop = days.map((day, index) => {
-    const dayEntries = entriesForDate(day);
+    const dayEntries = singleDayEntriesForDate(day);
     const isSelected = activeDay && sameDate(day, activeDay);
     const classes = ["week-day", isSelected ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
     return `<section class="${classes}" data-calendar-date="${dateString(day)}" role="button" tabindex="0" aria-pressed="${isSelected ? "true" : "false"}" aria-label="${escapeHTML(longDate(day))} auswählen">
@@ -657,22 +740,36 @@ function renderWeek() {
         <strong>${["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index]}</strong>
         <span>${shortDate(day)}</span>
       </div>
+      <div class="week-range-space" aria-hidden="true"></div>
       <div class="week-entries">${dayEntries.length ? dayEntries.map(entry => compactEntryHTML(entry)).join("") : '<div class="week-empty">Keine Einträge</div>'}</div>
     </section>`;
   }).join("");
 
   const mobile = days.map((day, index) => {
-    const dayEntries = entriesForDate(day);
+    const dayEntries = singleDayEntriesForDate(day);
     const classes = ["strip-day", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : "", index === 6 ? "sunday" : ""].filter(Boolean).join(" ");
+    const previews = dayEntries.slice(0, 2).map(entry => `<span class="strip-event ${escapeHTML(entry.type)}">${escapeHTML(calendarPreviewTitle(entry))}</span>`).join("");
+    const more = dayEntries.length > 2 ? `<span class="strip-more">+${dayEntries.length - 2}</span>` : "";
     return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
       <span class="strip-weekday">${["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][index]}</span>
       <span class="strip-number">${day.getDate()}</span>
-      ${eventBars(dayEntries, 4)}
+      <span class="strip-range-space" aria-hidden="true"></span>
+      <span class="strip-events">${previews}${more}</span>
     </button>`;
   }).join("");
 
-  return `<div class="week-desktop"><div class="week-grid">${desktop}</div></div>
-    <div class="week-mobile"><div class="week-strip">${mobile}</div></div>`;
+  return `<div class="week-desktop">
+      <div class="week-calendar-row" style="--range-rows:${rangeLayout.laneCount}">
+        <div class="week-grid">${desktop}</div>
+        ${rangeLayerHTML(rangeLayout, "range-event-layer week-range-layer")}
+      </div>
+    </div>
+    <div class="week-mobile">
+      <div class="week-calendar-row mobile-week-calendar-row" style="--range-rows:${rangeLayout.laneCount}">
+        <div class="week-strip">${mobile}</div>
+        ${rangeLayerHTML(rangeLayout, "range-event-layer week-range-layer")}
+      </div>
+    </div>`;
 }
 
 function renderMonth() {
@@ -682,20 +779,29 @@ function renderMonth() {
   const weekdayHeader = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
     .map((name, index) => `<div class="weekday-label ${index === 6 ? "sunday" : ""}">${name}</div>`).join("");
 
-  const cells = days.map(day => {
-    const dayEntries = entriesForDate(day);
-    const outside = day.getMonth() !== selectedDate.getMonth();
-    const classes = ["month-day", outside ? "outside" : "", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
-    const labels = dayEntries.slice(0, 3).map(entry => `<span class="month-event ${escapeHTML(entry.type)}">${escapeHTML(entryTitle(entry))}</span>`).join("");
-    const more = dayEntries.length > 3 ? `<span class="month-more">+${dayEntries.length - 3}</span>` : "";
-    return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
-      <span class="month-number">${day.getDate()}</span>
-      <span class="month-events">${labels}${more}</span>
-      ${eventBars(dayEntries, 4)}
-    </button>`;
+  const weeks = Array.from({ length: 6 }, (_, weekIndex) => {
+    const weekDays = days.slice(weekIndex * 7, weekIndex * 7 + 7);
+    const rangeLayout = buildRangeLayout(weekDays[0], weekDays[6]);
+    const cells = weekDays.map(day => {
+      const dayEntries = singleDayEntriesForDate(day);
+      const outside = day.getMonth() !== selectedDate.getMonth();
+      const classes = ["month-day", outside ? "outside" : "", activeDay && sameDate(day, activeDay) ? "selected" : "", isToday(day) ? "today" : ""].filter(Boolean).join(" ");
+      const labels = dayEntries.slice(0, 3).map(entry => `<span class="month-event ${escapeHTML(entry.type)}">${escapeHTML(calendarPreviewTitle(entry))}</span>`).join("");
+      const more = dayEntries.length > 3 ? `<span class="month-more">+${dayEntries.length - 3}</span>` : "";
+      return `<button class="${classes}" type="button" data-calendar-date="${dateString(day)}">
+        <span class="month-number">${day.getDate()}</span>
+        <span class="month-range-space" aria-hidden="true"></span>
+        <span class="month-events">${labels}${more}</span>
+      </button>`;
+    }).join("");
+
+    return `<div class="month-week" style="--range-rows:${rangeLayout.laneCount}">
+      <div class="month-week-days">${cells}</div>
+      ${rangeLayerHTML(rangeLayout, "range-event-layer month-range-layer")}
+    </div>`;
   }).join("");
 
-  return `<div class="weekday-row">${weekdayHeader}</div><div class="month-grid">${cells}</div>`;
+  return `<div class="weekday-row">${weekdayHeader}</div><div class="month-grid">${weeks}</div>`;
 }
 
 function renderAgenda() {
@@ -723,7 +829,7 @@ function renderCalendar(animate = false) {
   if (currentView === "week") {
     const monday = startOfWeek(selectedDate);
     const sunday = addDays(monday, 6);
-    $("period-label").textContent = `KW ${swissWeekNumber(monday)} · ${shortDate(monday)}–${shortDate(sunday)}`;
+    $("period-label").textContent = `KW ${swissWeekNumber(monday)}, ${shortDate(monday)} bis ${shortDate(sunday)}`;
     $("calendar-surface").innerHTML = renderWeek();
   } else {
     $("period-label").textContent = selectedDate.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
@@ -781,7 +887,7 @@ function searchResultHTML(entry, isPast) {
   const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
   const secondary = entry.type === "organisatorisch" ? entry.infos : entry.thema;
   const dateLabel = entry.dateTo && entry.dateTo !== entry.date
-    ? `${shortDate(parseDate(entry.date))} – ${shortDate(parseDate(entry.dateTo))}`
+    ? `${shortDate(parseDate(entry.date))} bis ${shortDate(parseDate(entry.dateTo))}`
     : longDate(parseDate(entry.date));
   return `<button class="search-result ${isPast ? "past" : ""}" type="button" data-search-entry-id="${safeId(entry.id)}">
     <span class="search-result-kind ${escapeHTML(entry.type)}">${escapeHTML(meta.icon)} ${escapeHTML(meta.short)}</span>
@@ -869,7 +975,7 @@ function setEntryType(type) {
   $("range-date-row").hidden = !organisational;
   $("subject-row").hidden = organisational;
   $("entry-topic-label").textContent = organisational ? "Ereignis" : "Auftrag / Thema";
-  $("entry-topic").placeholder = organisational ? "z. B. Sporttag oder Herbstferien" : "z. B. Seiten 45–52 lesen";
+  $("entry-topic").placeholder = organisational ? "z. B. Sporttag oder Herbstferien" : "z. B. Seiten 45 bis 52 lesen";
 }
 
 function setEntryVisibility(visibility) {
@@ -1068,7 +1174,7 @@ async function saveEntry(event) {
         editedAt: null
       });
       const visibilityText = selectedVisibility === "alle" ? "alle sehen ihn" : selectedVisibility === "privat" ? "nur du siehst ihn" : `sichtbar für ${visibleToNames.join(", ")}`;
-      toast(`✓ Gespeichert – ${visibilityText}`);
+      toast(`✓ Gespeichert, ${visibilityText}`);
     }
     closeModal("entry-modal");
   } catch (error) {
@@ -1146,7 +1252,7 @@ function exportEntryToCalendar(entry) {
 function createNoteFromEntry(entry) {
   const params = new URLSearchParams({
     new: "1",
-    title: `${entryTitle(entry)} – ${shortDate(parseDate(entry.date))}`,
+    title: `${entryTitle(entry)}, ${shortDate(parseDate(entry.date))}`,
     body: [entry.thema, entry.infos, safeLink(entry.linkUrl)].filter(Boolean).join("\n\n"),
     fromEntry: entry.id
   });
@@ -1177,7 +1283,7 @@ function openEntryDetail(entryId) {
   const author = profileFor(entry.authorUid) || { uid: entry.authorUid, nickname: entry.authorName || "Unbekannt", photoData: null };
   const meta = TYPE_META[entry.type] || TYPE_META.organisatorisch;
   const dateLabel = entry.dateTo && entry.dateTo !== entry.date
-    ? `${longDate(parseDate(entry.date))} – ${longDate(parseDate(entry.dateTo))}`
+    ? `${longDate(parseDate(entry.date))} bis ${longDate(parseDate(entry.dateTo))}`
     : longDate(parseDate(entry.date));
   const canManage = canManageEntry(entry);
   const canReport = entry.authorUid !== currentUser.uid;
@@ -1438,7 +1544,11 @@ async function blockUser(uid, name) {
   if (!isAdmin() || uid === currentUser.uid) return;
   if (!confirm(`${name} wirklich sperren? Die Person kann danach keine Klassendaten mehr öffnen.`)) return;
   try {
-    await updateDoc(doc(db, COLLECTIONS.members, uid), { blocked: true, blockedAt: serverTimestamp(), blockedByUid: currentUser.uid });
+    await setDoc(doc(db, COLLECTIONS.blocks, uid), {
+      blocked: true,
+      createdAt: serverTimestamp(),
+      createdByUid: currentUser.uid
+    });
     closeModal("profile-modal");
     toast(`🚫 ${name} wurde gesperrt`);
   } catch {
@@ -1498,7 +1608,7 @@ async function handleRegistration(event) {
     await closeRegistrationTicket(ticket.ticketId);
     $("register-class-password").value = "";
     await loadSession(credential.user);
-    toast("✓ Konto erstellt – willkommen!");
+    toast("✓ Konto erstellt, willkommen!");
   } catch (error) {
     console.error(error);
     await closeRegistrationTicket(ticket?.ticketId);
@@ -1581,6 +1691,7 @@ $("desktop-add-btn").addEventListener("click", openAddEntry);
 $("mobile-add-btn").addEventListener("click", openAddEntry);
 
 function handleCalendarClick(event) {
+  if (Date.now() < ignoreCalendarClickUntil) return;
   const entryButton = event.target.closest("[data-entry-id]");
   if (entryButton) return openEntryDetail(decodeId(entryButton.dataset.entryId));
   const dateButton = event.target.closest("[data-calendar-date]");
@@ -1591,6 +1702,46 @@ function handleCalendarClick(event) {
 
 $("calendar-surface").addEventListener("click", handleCalendarClick);
 $("agenda-list").addEventListener("click", handleCalendarClick);
+
+let calendarTouchStartX = 0;
+let calendarTouchStartY = 0;
+let calendarTouchActive = false;
+const calendarSurface = $("calendar-surface");
+
+calendarSurface.addEventListener("touchstart", event => {
+  if (event.touches.length !== 1) return;
+  calendarTouchStartX = event.touches[0].clientX;
+  calendarTouchStartY = event.touches[0].clientY;
+  calendarTouchActive = true;
+}, { passive: true });
+
+calendarSurface.addEventListener("touchend", event => {
+  if (!calendarTouchActive || event.changedTouches.length !== 1) return;
+  calendarTouchActive = false;
+  const deltaX = event.changedTouches[0].clientX - calendarTouchStartX;
+  const deltaY = event.changedTouches[0].clientY - calendarTouchStartY;
+  if (Math.abs(deltaX) < 55 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.3) return;
+  ignoreCalendarClickUntil = Date.now() + 450;
+  navigatePeriod(deltaX < 0 ? 1 : -1);
+}, { passive: true });
+
+calendarSurface.addEventListener("touchcancel", () => { calendarTouchActive = false; }, { passive: true });
+
+let wheelDistance = 0;
+let wheelResetTimer = null;
+let lastWheelNavigation = 0;
+calendarSurface.addEventListener("wheel", event => {
+  if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) * 1.35 || Math.abs(event.deltaX) < 2) return;
+  event.preventDefault();
+  clearTimeout(wheelResetTimer);
+  wheelDistance += event.deltaX;
+  wheelResetTimer = setTimeout(() => { wheelDistance = 0; }, 180);
+  if (Math.abs(wheelDistance) < 70 || Date.now() - lastWheelNavigation < 450) return;
+  lastWheelNavigation = Date.now();
+  ignoreCalendarClickUntil = Date.now() + 450;
+  navigatePeriod(wheelDistance > 0 ? 1 : -1);
+  wheelDistance = 0;
+}, { passive: false });
 
 $("calendar-surface").addEventListener("keydown", event => {
   if (!['Enter', ' '].includes(event.key) || event.target.closest("[data-entry-id]")) return;
@@ -1684,4 +1835,4 @@ $("reports-list").addEventListener("click", event => {
 });
 
 const protectedSession = await requireClassSession("../");
-if (protectedSession) await loadSession(protectedSession.user);
+if (protectedSession) await loadSession(protectedSession.user, protectedSession);
