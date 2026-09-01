@@ -1,11 +1,12 @@
 import {
-  collection, addDoc, deleteDoc, doc, getDocs, onSnapshot, query,
+  collection, addDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction,
   serverTimestamp, setDoc, updateDoc, where, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   sendEmailVerification, sendPasswordResetEmail, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { auth, db, isAdminUser } from "./firebase.js";
+import { DEFAULT_ARCADE_PROFILE, DEFAULT_SCORES, badgeProgress } from "./arcade-data.js";
 
 const STATUS_LABELS = { open: "Eingegangen", review: "Wird geprüft", done: "Erledigt" };
 const CATEGORY_LABELS = {
@@ -30,6 +31,10 @@ let notificationStates = new Map();
 let notificationSelectedUids = new Set();
 let adminTab = "feedback";
 let toastTimer = null;
+let arcadeProfileUnsubscribe = null;
+let ownWallet = {};
+let ownArcadeProfile = { ...DEFAULT_ARCADE_PROFILE };
+let ownScores = { ...DEFAULT_SCORES };
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -126,6 +131,13 @@ function injectShell() {
         <div class="g23f-status-list" id="g23f-own-feedback"></div>
       </section>
     </div>
+    <div class="g23f-shell-modal" id="g23f-public-profile-modal" hidden>
+      <section class="g23f-shell-panel" role="dialog" aria-modal="true" aria-labelledby="g23f-public-profile-title">
+        <button class="g23f-shell-close" type="button" data-g23f-close="g23f-public-profile-modal" aria-label="Schliessen">✕</button>
+        <p class="g23f-shell-kicker">Klassenprofil</p><h2 id="g23f-public-profile-title">Profil</h2>
+        <div id="g23f-public-profile-content"><p class="g23f-shell-muted">Profil wird geladen …</p></div>
+      </section>
+    </div>
     <div class="g23f-shell-modal" id="g23f-notifications-modal" hidden>
       <section class="g23f-shell-panel wide" role="dialog" aria-modal="true" aria-labelledby="g23f-notifications-title">
         <button class="g23f-shell-close" type="button" data-g23f-close="g23f-notifications-modal" aria-label="Schliessen">✕</button>
@@ -171,6 +183,7 @@ function injectShell() {
           <button class="g23f-shell-btn active" type="button" data-admin-tab="feedback">Feedback</button>
           <button class="g23f-shell-btn" type="button" data-admin-tab="reports">Meldungen</button>
           <button class="g23f-shell-btn" type="button" data-admin-tab="accounts">Konten</button>
+          <button class="g23f-shell-btn" type="button" data-admin-tab="coins">Münzen</button>
         </div>
         <div class="g23f-admin-section" id="g23f-admin-content"></div>
       </section>
@@ -192,6 +205,7 @@ function renderProfile() {
       <div><h3>${escapeHTML(profile.nickname || "Profil")}</h3><p class="g23f-shell-muted">E-Mail ${verified ? "bestätigt ✓" : "noch nicht bestätigt"}</p></div>
     </div>
     <p class="g23f-shell-muted">Dein Vorname ist deine eindeutige Klassen-ID und kann nicht frei geändert werden.</p>
+    <div class="g23f-arcade-summary"><strong>🪙 ${Number(ownWallet.balance || 0)} Münzen</strong><span>${badgeProgress(ownWallet, ownScores).filter(item => item.tier >= 0).length} Abzeichen verdient</span><a href="${escapeHTML(currentContext.rootPath)}arcade/">Arcade, Shop und Spiele öffnen</a></div>
     <div class="g23f-shell-actions">
       <label class="g23f-shell-btn g23f-photo-label">📷 Profilbild ändern<input id="g23f-photo-input" type="file" accept="image/*"></label>
       <button class="g23f-shell-btn" id="g23f-reset-password" type="button">Passwort zurücksetzen</button>
@@ -212,10 +226,41 @@ function renderProfile() {
   document.getElementById("g23f-profile-logout")?.addEventListener("click", logout);
 }
 
+function renderBadgeGrid(wallet, scores) {
+  return `<div class="g23f-badge-grid">${badgeProgress(wallet, scores).map(item => `<div class="g23f-badge ${item.tier < 0 ? "locked" : `tier-${item.tier}`}"><span>${item.icon}</span><strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.tierName)}</small><em>${item.tier >= 4 ? "Maximum" : `${item.value} / ${item.next}`}</em></div>`).join("")}</div>`;
+}
+
+export async function openPublicProfile(uid) {
+  if (!currentContext || !uid) return;
+  setModal("g23f-public-profile-modal", true);
+  const target = document.getElementById("g23f-public-profile-content");
+  target.innerHTML = '<p class="g23f-shell-muted">Profil wird geladen …</p>';
+  try {
+    const [profileSnap, walletSnap, arcadeSnap, scoreSnap] = await Promise.all([
+      getDoc(doc(db, "users", uid)), getDoc(doc(db, "coinWallets", uid)),
+      getDoc(doc(db, "arcadeProfiles", uid)), getDoc(doc(db, "gameScores", uid))
+    ]);
+    if (!profileSnap.exists()) throw new Error("missing");
+    const person = profileSnap.data(), publicWallet = walletSnap.data() || {}, publicArcade = arcadeSnap.data() || DEFAULT_ARCADE_PROFILE;
+    target.innerHTML = `<div class="g23f-public-head"><span class="g23f-shell-avatar g23f-frame ${escapeHTML(publicArcade.equippedFrame || "default")}">${avatarInner(person)}</span><div><h3>${escapeHTML(person.nickname || "Profil")}</h3><p>🪙 ${Number(publicWallet.balance || 0)} Münzen</p></div></div><h3 class="g23f-badge-heading">Abzeichen</h3>${renderBadgeGrid(publicWallet, scoreSnap.data() || {})}`;
+  } catch { target.innerHTML = '<p class="g23f-shell-muted">Dieses Profil konnte nicht geladen werden.</p>'; }
+}
+
+function startArcadeProfile() {
+  arcadeProfileUnsubscribe?.();
+  const uid = currentContext.user.uid;
+  const stops = [
+    onSnapshot(doc(db,"coinWallets",uid), snap => { ownWallet=snap.data()||{}; document.querySelectorAll("[data-g23f-coins]").forEach(x=>x.textContent=String(ownWallet.balance||0)); if(!document.getElementById("g23f-profile-modal")?.hidden) renderProfile(); }),
+    onSnapshot(doc(db,"arcadeProfiles",uid), snap => { ownArcadeProfile={...DEFAULT_ARCADE_PROFILE,...snap.data()}; document.documentElement.dataset.g23fTheme=(ownArcadeProfile.equippedTheme||"classic").replace("theme-",""); updateProfileTriggers(); }),
+    onSnapshot(doc(db,"gameScores",uid), snap => { ownScores={...DEFAULT_SCORES,...snap.data()}; if(!document.getElementById("g23f-profile-modal")?.hidden) renderProfile(); })
+  ];
+  arcadeProfileUnsubscribe=()=>stops.forEach(stop=>stop());
+}
+
 function updateProfileTriggers() {
   document.querySelectorAll("[data-g23f-profile]").forEach(button => {
     button.classList.add("g23f-profile-trigger");
-    button.innerHTML = `<span class="g23f-shell-avatar">${avatarInner(currentContext.profile)}</span><span class="g23f-profile-name">${escapeHTML(currentContext.profile.nickname || "Profil")}</span>`;
+    button.innerHTML = `<span class="g23f-shell-avatar g23f-frame ${escapeHTML(ownArcadeProfile.equippedFrame || "default")}">${avatarInner(currentContext.profile)}</span><span class="g23f-profile-name">${escapeHTML(currentContext.profile.nickname || "Profil")}</span>`;
     button.hidden = false;
   });
   document.querySelectorAll("[data-g23f-admin]").forEach(button => {
@@ -302,6 +347,7 @@ function notificationTypeLabel(item) {
   if (item.sourceType === "email") return "E-Mail-Bestätigung";
   if (item.sourceType === "feedback") return "Feedback";
   if (item.sourceType === "report") return "Meldung";
+  if (item.sourceType === "coins") return "Münzen";
   return item.kind === "automatic" ? "Automatisch" : "Mitteilung von Elias";
 }
 
@@ -766,10 +812,36 @@ function renderAdmin() {
     container.innerHTML = list.length ? list.map(item => `<article class="g23f-admin-card"><div class="g23f-card-head"><h3>${item.targetType === "entry" ? "📅 Gemeldeter Eintrag" : `👤 Konto: ${escapeHTML(item.targetLabel)}`}</h3><span class="g23f-status-pill ${item.status === "open" ? "" : "done"}">${item.status === "open" ? "Offen" : "Erledigt"}</span></div><p>${escapeHTML(item.reason)} · gemeldet von ${escapeHTML(item.reporterName || "Unbekannt")}</p>${item.details ? `<p>${escapeHTML(item.details)}</p>` : ""}${item.targetType === "entry" ? '<p>🔒 Titel und Inhalt eines geschützten Eintrags werden hier nicht angezeigt.</p>' : ""}<div class="g23f-shell-actions">${item.status === "open" ? `<button class="g23f-shell-btn" type="button" data-resolve-report="${encodeId(item.id)}">Erledigt</button>` : ""}${item.targetType === "entry" ? `<button class="g23f-shell-btn danger" type="button" data-delete-reported-entry="${encodeId(item.id)}">Eintrag löschen</button>` : `<button class="g23f-shell-btn danger" type="button" data-block-reported-user="${encodeId(item.id)}">Konto sperren</button>`}</div></article>`).join("") : '<div class="g23f-shell-empty">Keine Meldungen.</div>';
     return;
   }
+  if (adminTab === "coins") {
+    container.innerHTML = `<div class="g23f-coin-admin-intro"><h3>Münzen vergeben</h3><p class="g23f-shell-muted">Du entscheidest selbst, wie viele Münzen eine schulische Hilfe wert ist. Null Münzen speichert nichts.</p></div>${adminAccounts.filter(account => account.uid !== currentContext.user.uid).map(account => `<article class="g23f-admin-card g23f-coin-row"><div><strong>${escapeHTML(account.nickname)}</strong><small>Persönliche Belohnung</small></div><input type="text" maxlength="120" placeholder="Grund, z. B. Eintrag ergänzt" data-coin-reason="${encodeId(account.uid)}"><div class="g23f-coin-buttons">${[1,3,5,10].map(amount => `<button class="g23f-shell-btn" type="button" data-award-coins="${encodeId(account.uid)}" data-amount="${amount}">＋${amount}</button>`).join("")}<input class="g23f-custom-coins" type="number" min="1" max="100" value="1" aria-label="Eigener Münzbetrag" data-custom-coins="${encodeId(account.uid)}"><button class="g23f-shell-btn" type="button" data-award-coins="${encodeId(account.uid)}" data-amount="custom">Eigene</button></div></article>`).join("") || '<div class="g23f-shell-empty">Konten werden geladen …</div>'}`;
+    return;
+  }
   container.innerHTML = adminAccounts.length ? adminAccounts.map(account => `<article class="g23f-admin-card g23f-account-row"><div class="g23f-account-name"><strong>${escapeHTML(account.nickname)}</strong>${account.blocked ? '<span class="g23f-status-pill">Gesperrt</span>' : ""}</div>${account.uid === currentContext.user.uid ? '<span class="g23f-shell-muted">Du</span>' : `<button class="g23f-shell-btn ${account.blocked ? "" : "danger"}" type="button" data-toggle-account="${encodeId(account.uid)}" data-blocked="${account.blocked}">${account.blocked ? "Entsperren" : "Sperren"}</button>`}</article>`).join("") : '<div class="g23f-shell-empty">Konten konnten nicht geladen werden.</div>';
 }
 
 async function handleAdminAction(event) {
+  const awardButton = event.target.closest("[data-award-coins]");
+  if (awardButton) {
+    const uid = decodeId(awardButton.dataset.awardCoins);
+    const amount = awardButton.dataset.amount === "custom" ? Number(document.querySelector(`[data-custom-coins="${encodeId(uid)}"]`)?.value) : Number(awardButton.dataset.amount);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 100) { toast("Wähle 1 bis 100 Münzen."); return; }
+    const account = adminAccounts.find(item => item.uid === uid);
+    const reasonInput = document.querySelector(`[data-coin-reason="${encodeId(uid)}"]`);
+    const reason = reasonInput?.value.trim() || "Hilfreicher Beitrag zur Klassen-App";
+    try {
+      const walletRef = doc(db,"coinWallets",uid), txRef = doc(collection(db,"coinTransactions"));
+      await runTransaction(db, async transaction => {
+        const walletSnap = await transaction.get(walletRef);
+        const wallet = walletSnap.data() || { uid, balance:0, earned:0, spent:0, awardCount:0 };
+        transaction.set(walletRef,{...wallet,balance:(wallet.balance||0)+amount,earned:(wallet.earned||0)+amount,awardCount:(wallet.awardCount||0)+1,updatedAt:serverTimestamp()});
+        transaction.set(txRef,{uid,nickname:account?.nickname||"Profil",amount,type:"award",reason,sourceType:"school",sourceId:txRef.id,createdAt:serverTimestamp(),createdByUid:currentContext.user.uid});
+      });
+      await addDoc(collection(db,"notifications"), notificationData({title:`${amount} Münzen erhalten`,message:`${reason}: Du hast ${amount} Münzen erhalten.`,targetUids:[uid],targetNames:[account?.nickname||"Profil"],sourceType:"coins",sourceId:txRef.id}));
+      if (reasonInput) reasonInput.value="";
+      toast(`✓ ${amount} Münzen an ${account?.nickname || "das Konto"} vergeben`);
+    } catch (error) { console.error(error); toast("Die Münzen konnten nicht vergeben werden."); }
+    return;
+  }
   const status = event.target.closest("[data-feedback-status]");
   if (status) {
     if (event.type !== "change") return;
@@ -860,6 +932,7 @@ async function logout() {
   notificationAllUnsubscribe?.();
   notificationSpecificUnsubscribe?.();
   notificationStateUnsubscribe?.();
+  arcadeProfileUnsubscribe?.();
   try { localStorage.removeItem("g23f-session-expected"); } catch {}
   await signOut(auth);
   location.href = currentContext.rootPath;
@@ -897,6 +970,7 @@ export function mountGlobalShell({ user, profile, rootPath = "./", pageLabel = "
   ensureNotificationTriggers();
   updateProfileTriggers();
   renderProfile();
+  startArcadeProfile();
 
   document.querySelectorAll("[data-g23f-profile]").forEach(button => button.addEventListener("click", () => { renderProfile(); setModal("g23f-profile-modal", true); }));
   document.querySelectorAll("[data-g23f-notifications]").forEach(button => button.addEventListener("click", () => {
@@ -909,13 +983,17 @@ export function mountGlobalShell({ user, profile, rootPath = "./", pageLabel = "
   document.querySelectorAll("[data-g23f-feedback]").forEach(button => button.addEventListener("click", () => openFeedback()));
   document.querySelectorAll("[data-g23f-close]").forEach(button => button.addEventListener("click", () => setModal(button.dataset.g23fClose, false)));
   document.querySelectorAll(".g23f-shell-modal").forEach(modal => modal.addEventListener("click", event => { if (event.target === modal) setModal(modal.id, false); }));
+  document.addEventListener("click", event => {
+    const publicTrigger = event.target.closest("[data-g23f-user]");
+    if (publicTrigger && !publicTrigger.closest("[data-g23f-profile]")) openPublicProfile(publicTrigger.dataset.g23fUser);
+  });
   document.getElementById("g23f-feedback-form").addEventListener("submit", submitFeedback);
   document.getElementById("g23f-admin-tabs").addEventListener("click", event => {
     const button = event.target.closest("[data-admin-tab]");
     if (!button) return;
     adminTab = button.dataset.adminTab;
     renderAdmin();
-    if (adminTab === "accounts") loadAccounts();
+    if (adminTab === "accounts" || adminTab === "coins") loadAccounts();
   });
   document.getElementById("g23f-admin-content").addEventListener("click", handleAdminAction);
   document.getElementById("g23f-admin-content").addEventListener("change", handleAdminAction);

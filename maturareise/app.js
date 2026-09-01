@@ -1,9 +1,10 @@
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc
+  addDoc, collection, deleteDoc, doc, getDoc, onSnapshot, serverTimestamp, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { db } from "../shared/firebase.js";
 import { requireClassSession } from "../shared/session.js";
 import { mountGlobalShell } from "../shared/shell.js";
+import { SHOP_ITEMS } from "../shared/arcade-data.js";
 
 const COLORS = new Set(["sand", "yellow", "rose", "blue", "green"]);
 const BOARD_WIDTH = 1600;
@@ -25,6 +26,7 @@ let toastTimer = null;
 let boardScale = 1;
 let pinchGesture = null;
 let initialBoardViewPending = true;
+let availableDesigns = new Set(["classic"]);
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -215,7 +217,8 @@ function saveNewCardDraft() {
     }
     localStorage.setItem(key, JSON.stringify({
       content,
-      color: document.querySelector('input[name="card-color"]:checked')?.value || "sand"
+      color: document.querySelector('input[name="card-color"]:checked')?.value || "sand",
+      design: $("card-design").value || "classic"
     }));
   } catch {}
 }
@@ -268,12 +271,13 @@ function renderCards(state = "ready") {
     article.className = `trip-card${editable ? " owned" : ""}`;
     article.dataset.cardId = card.id;
     article.dataset.color = COLORS.has(card.color) ? card.color : "sand";
+    article.dataset.design = card.design || "classic";
     article.style.left = `${position.x}px`;
     article.style.top = `${position.y}px`;
     article.style.zIndex = String(index + 1);
     article.style.setProperty("--tilt", `${tiltFor(card.id)}deg`);
     article.innerHTML = `
-      <div class="trip-card-handle"><span>${editable ? "↕ Verschieben" : "Beitrag"}</span><span>${escapeHTML(card.authorName || "Unbekannt")}</span></div>
+      <div class="trip-card-handle"><span>${editable ? "↕ Verschieben" : "Beitrag"}</span><button class="trip-author" type="button" data-g23f-user="${escapeHTML(card.authorUid)}">${escapeHTML(card.authorName || "Unbekannt")}</button></div>
       <button class="trip-card-open" type="button" ${editable ? "" : "tabindex=\"-1\""}>${escapeHTML(card.content)}</button>
       <small class="trip-card-meta">Von ${escapeHTML(card.authorName || "Unbekannt")} · zuletzt bearbeitet von ${escapeHTML(card.editedByName || card.authorName || "Unbekannt")} · ${escapeHTML(formatDate(card.updatedAt || card.createdAt))}</small>`;
     board.append(article);
@@ -308,6 +312,7 @@ function openEditor(card = null, position = null) {
     ? card.color
     : (COLORS.has(recoveredDraft?.color) ? recoveredDraft.color : "sand");
   document.querySelector(`input[name="card-color"][value="${color}"]`).checked = true;
+  $("card-design").value = availableDesigns.has(card?.design) ? card.design : (availableDesigns.has(recoveredDraft?.design) ? recoveredDraft.design : "classic");
   $("editor-meta").textContent = card
     ? `Von ${card.authorName || "Unbekannt"}, zuletzt bearbeitet von ${card.editedByName || card.authorName || "Unbekannt"} am ${formatDate(card.updatedAt || card.createdAt)}`
     : (recoveredDraft
@@ -321,6 +326,7 @@ function openEditor(card = null, position = null) {
 async function saveCard() {
   const content = $("card-content").value.trim();
   const color = document.querySelector('input[name="card-color"]:checked')?.value || "sand";
+  const design = availableDesigns.has($("card-design").value) ? $("card-design").value : "classic";
   if (!content) {
     $("editor-error").textContent = "Schreib zuerst etwas in den Beitrag.";
     return;
@@ -337,6 +343,7 @@ async function saveCard() {
       await updateDoc(doc(db, "maturareiseBoard", editingId), {
         content,
         color,
+        design,
         updatedAt: serverTimestamp(),
         editedByUid: currentUser.uid,
         editedByName: currentProfile.nickname
@@ -348,6 +355,7 @@ async function saveCard() {
         authorName: currentProfile.nickname,
         content,
         color,
+        design,
         x: Math.round(draftPosition.x),
         y: Math.round(draftPosition.y),
         createdAt: serverTimestamp(),
@@ -385,6 +393,7 @@ async function removeCard() {
 }
 
 function beginDrag(event) {
+  if (event.target.closest("[data-g23f-user]")) return;
   const handle = event.target.closest(".trip-card-handle");
   if (!handle || event.button !== 0) return;
   const element = handle.closest(".trip-card");
@@ -528,6 +537,12 @@ if (session) {
   currentUser = session.user;
   currentProfile = session.profile;
   admin = session.admin;
+  try {
+    const arcadeSnap = await getDoc(doc(db,"arcadeProfiles",session.user.uid));
+    const owned = arcadeSnap.data()?.ownedItems || [];
+    SHOP_ITEMS.filter(item => item.type === "board" && (admin || owned.includes(item.id))).forEach(item => availableDesigns.add(item.id));
+    $("card-design").innerHTML = '<option value="classic">Klassisch</option>' + SHOP_ITEMS.filter(item => item.type === "board" && availableDesigns.has(item.id)).map(item => `<option value="${item.id}">${item.preview} ${item.name}</option>`).join("");
+  } catch {}
   mountGlobalShell({
     user: session.user,
     profile: session.profile,
