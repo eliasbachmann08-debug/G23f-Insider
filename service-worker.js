@@ -1,34 +1,29 @@
-const CACHE_NAME = "g23f-insider-v19-2026-09-01";
+const CACHE_NAME = "g23f-insider-v18-2026-08-30";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=2026-09-01-1",
-  "./app.js?v=2026-09-01-1",
+  "./styles.css?v=2026-08-21-3",
+  "./app.js?v=2026-08-21-3",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
   "./stundenplan/index.html",
-  "./stundenplan/styles.css?v=2026-09-01-1",
-  "./stundenplan/app.js?v=2026-09-01-1",
+  "./stundenplan/styles.css?v=2026-08-30-6",
+  "./stundenplan/app.js?v=2026-08-30-2",
   "./notes/index.html",
   "./notes/styles.css",
   "./notes/app.js",
   "./shared/firebase.js",
   "./shared/session.js",
-  "./shared/shell.css?v=2026-09-01-1",
+  "./shared/shell.css",
   "./shared/shell.js",
-  "./shared/arcade-data.js",
   "./faecher/index.html",
   "./faecher/styles.css",
   "./faecher/app.js",
   "./faecher/faecher.json",
   "./maturareise/index.html",
-  "./maturareise/styles.css?v=2026-09-01-1",
-  "./maturareise/app.js?v=2026-09-01-1",
-  "./arcade/index.html",
-  "./arcade/styles.css?v=2026-09-01-1",
-  "./arcade/skins.css?v=2026-09-01-1",
-  "./arcade/app.js?v=2026-09-01-1",
+  "./maturareise/styles.css?v=2026-08-21-2",
+  "./maturareise/app.js?v=2026-08-21-2",
   "./faecher/biologie/index.html",
   "./faecher/biologie/app.js",
   "./faecher/biologie/themen.json"
@@ -71,7 +66,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (event.request.destination === "style" || event.request.destination === "script") {
+  if (requestUrl.pathname.startsWith("/stundenplan/") &&
+      (event.request.destination === "style" || event.request.destination === "script")) {
     event.respondWith(
       fetch(event.request, { cache: "no-cache" }).then(response => {
         if (response.ok) {

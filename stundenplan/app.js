@@ -10,7 +10,6 @@ import {
 import { auth, db, isAdminUser } from "../shared/firebase.js";
 import { requireClassSession } from "../shared/session.js";
 import { mountGlobalShell } from "../shared/shell.js";
-import { DEFAULT_ARCADE_PROFILE, badgeProgress } from "../shared/arcade-data.js";
 
 const COLLECTIONS = {
   entries: "eintraege",
@@ -1340,19 +1339,13 @@ async function openProfile(uid) {
   $("profile-content").innerHTML = '<div class="empty-state">Profil wird geladen …</div>';
   openModal("profile-modal");
   try {
-    const [profile, walletSnapshot, arcadeSnapshot, scoreSnapshot] = await Promise.all([
-      getProfile(uid), getDoc(doc(db,"coinWallets",uid)), getDoc(doc(db,"arcadeProfiles",uid)), getDoc(doc(db,"gameScores",uid))
-    ]);
-    const wallet = walletSnapshot.data() || {};
-    const arcade = { ...DEFAULT_ARCADE_PROFILE, ...arcadeSnapshot.data() };
-    const badges = badgeProgress(wallet, scoreSnapshot.data() || {});
+    const profile = await getProfile(uid);
     const own = uid === currentUser.uid;
     const joined = formatTimestamp(profile.createdAt);
     $("profile-content").innerHTML = `
       <div class="profile-card">
-        ${avatarHTML(profile, `g23f-frame ${escapeHTML(arcade.equippedFrame || "default")}`)}
+        ${avatarHTML(profile)}
         <h2>${escapeHTML(profile.nickname || "Unbekannt")}</h2>
-        <p class="profile-coin-count">🪙 ${Number(wallet.balance || 0)} Münzen</p>
         ${joined ? `<p class="detail-meta">Dabei seit ${escapeHTML(timestampDate(profile.createdAt).toLocaleDateString("de-CH", { month: "long", year: "numeric" }))}</p>` : ""}
         ${own ? '<p class="profile-id-note">Dein Vorname ist deine Klassen-ID. Für eine Korrektur meldest du dich bei Elias.</p>' : ""}
         ${own ? '<label class="photo-upload">📷 Profilbild ändern<input id="profile-photo-input" type="file" accept="image/*" hidden></label>' : ""}
@@ -1360,8 +1353,6 @@ async function openProfile(uid) {
           ${!own ? '<button class="action-btn danger" id="profile-report-btn" type="button">⚑ Konto melden</button>' : ""}
           ${isAdmin() && !own ? '<button class="action-btn danger" id="profile-block-btn" type="button">🚫 Konto sperren</button>' : ""}
         </div>
-        <h3 class="profile-badge-title">Abzeichen</h3>
-        <div class="g23f-badge-grid">${badges.map(item => `<div class="g23f-badge ${item.tier < 0 ? "locked" : `tier-${item.tier}`}"><span>${item.icon}</span><strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.tierName)}</small><em>${item.tier >= 4 ? "Maximum" : `${item.value} / ${item.next}`}</em></div>`).join("")}</div>
       </div>`;
     $("profile-photo-input")?.addEventListener("change", uploadProfilePhoto);
     $("profile-report-btn")?.addEventListener("click", () => openReport("user", uid, profile.nickname || "Unbekannt"));
