@@ -1,0 +1,10 @@
+{
+  "name": "g23f-kalender-sync",
+  "private": true,
+  "type": "module",
+  "description": "Kopiert die G23f-Einträge in einen privaten Google-Kalender.",
+  "dependencies": {
+    "firebase-admin": "12.7.0",
+    "googleapis": "144.0.0"
+  }
+}

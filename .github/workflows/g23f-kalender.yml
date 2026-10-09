@@ -1,0 +1,33 @@
+name: G23f-Kalender
+
+# Kopiert die G23f-Einträge stündlich in den privaten Google-Kalender «G23f».
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g23f-kalender
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Abhängigkeiten installieren
+        working-directory: tools/kalender-sync
+        run: npm install --no-audit --no-fund --loglevel=error
+      - name: Einträge übertragen
+        working-directory: tools/kalender-sync
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          G23F_CALENDAR_ID: ${{ secrets.G23F_CALENDAR_ID }}
+        run: node sync.mjs
