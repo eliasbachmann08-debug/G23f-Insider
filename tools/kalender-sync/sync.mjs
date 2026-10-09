@@ -124,13 +124,13 @@ for (const ev of wanted.values()) {
       await cal.events.update({ calendarId, eventId: ev.id, requestBody: ev });
       changed++;
     }
-  } catch (err) { failed++; firstCode ??= err.code; }
+  } catch (err) { failed++; firstCode ??= `${err.code} ${err.errors?.[0]?.reason || ''}`.trim(); }
 }
 for (const [id, cur] of existing) {
   if (wanted.has(id) || !id.startsWith('g23f')) continue;
   if (cur.start?.date && cur.start.date < from) continue;
   try { await cal.events.delete({ calendarId, eventId: id }); removed++; }
-  catch (err) { if (err.code !== 410) { failed++; firstCode ??= err.code; } }
+  catch (err) { if (err.code !== 410) { failed++; firstCode ??= `${err.code} ${err.errors?.[0]?.reason || ''}`.trim(); } }
 }
 
 const summary = `G23f-Kalender: ${wanted.size} Einträge, ${added} neu, ${changed} geändert, ${removed} entfernt, ${failed} Fehler.`;
