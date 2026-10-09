@@ -83,15 +83,14 @@ for (const doc of entrySnap.docs) {
   const tick = type === 'hausaufgabe' && done.has(doc.id) ? '✓ ' : '';
   wanted.set(eventId(doc.id), {
     id: eventId(doc.id),
-    summary: `${tick}${KIND[type]}: ${title}`.slice(0, 250),
+    summary: `${tick}${KIND[type]}: ${title}`.replace(/\s*\n+\s*/g, ' · ').slice(0, 250),
     description: [e.infos, e.linkUrl].filter(Boolean).join('\n\n').slice(0, 4000),
     start: { date: e.date },
     end: { date: addDays(last, 1) },
     transparency: 'transparent',
     colorId: type === 'test' ? '11' : type === 'organisatorisch' ? '5' : '9',
-    extendedProperties: { private: { g23f: '1', typ: type } },
-    // Tests: Erinnerung am Vorabend um 18:00
-    reminders: type === 'test' ? { useDefault: false, overrides: [{ method: 'popup', minutes: 360 }] } : { useDefault: false, overrides: [] }
+    // Erinnerungen gelten pro Person. Elias stellt sie in den Einstellungen des Kalenders G23f ein.
+    extendedProperties: { private: { g23f: '1', typ: type } }
   });
 }
 
