@@ -1,0 +1,9 @@
+{
+  "name": "whoop-sync",
+  "private": true,
+  "type": "module",
+  "description": "Trägt die WHOOP-Werte pro Tag in einen privaten Google-Kalender ein.",
+  "dependencies": {
+    "googleapis": "144.0.0"
+  }
+}

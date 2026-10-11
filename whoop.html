@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>WHOOP verbinden</title>
+<style>
+  :root { color-scheme: dark; --bg:#05080F; --card:#0B1220; --line:#1B2A44; --text:#E6F0FF; --muted:#8CA0BF; --accent:#62E1FF; --ok:#5FD39A; --err:#FF7A8A; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:16px; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { width:100%; max-width:440px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; }
+  h1 { margin:0 0 4px; font-size:20px; letter-spacing:.02em; }
+  p { margin:8px 0; color:var(--muted); }
+  label { display:block; margin:16px 0 6px; font-size:14px; color:var(--muted); }
+  input { width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:#060B15; color:var(--text); font:15px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  button, a.btn { display:block; width:100%; margin-top:12px; padding:12px; border:0; border-radius:10px; background:var(--accent); color:#00121A; font-weight:700; font-size:15px; text-align:center; text-decoration:none; cursor:pointer; }
+  a.btn.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  ol { margin:12px 0 0; padding-left:20px; color:var(--muted); }
+  li { margin:6px 0; }
+  .ok { color:var(--ok); } .err { color:var(--err); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="start">
+    <h1>WHOOP mit der Zentrale verbinden</h1>
+    <p>Einmalige Anmeldung. Danach holt ein GitHub-Job deine WHOOP-Werte stündlich in deinen privaten Kalender «WHOOP».</p>
+    <label for="cid">Client ID aus dem WHOOP Developer Dashboard</label>
+    <input id="cid" autocomplete="off" spellcheck="false" placeholder="z. B. 1a2b3c4d-…">
+    <button id="go">Bei WHOOP anmelden</button>
+  </section>
+
+  <section id="got" hidden>
+    <h1 class="ok">Anmeldung erlaubt</h1>
+    <p>Kopiere den Code und starte damit den GitHub-Job. Der Code gilt nur wenige Minuten.</p>
+    <label for="code">Code</label>
+    <input id="code" readonly>
+    <button id="copy">Code kopieren</button>
+    <ol>
+      <li>Auf GitHub «Run workflow» klicken.</li>
+      <li>Den Code ins Feld einfügen und grün «Run workflow» drücken.</li>
+    </ol>
+    <a class="btn ghost" href="https://github.com/eliasbachmann08-debug/G23f-Insider/actions/workflows/whoop.yml" target="_blank" rel="noopener">GitHub öffnen</a>
+    <p id="warn" class="err" hidden>Hinweis: Diese Anmeldung wurde nicht auf diesem Gerät gestartet. Wenn du sie nicht selbst gestartet hast, verwende den Code nicht.</p>
+  </section>
+
+  <section id="fail" hidden>
+    <h1 class="err">Anmeldung abgebrochen</h1>
+    <p id="failmsg"></p>
+    <a class="btn ghost" href="whoop.html">Nochmals versuchen</a>
+  </section>
+</main>
+<script>
+(() => {
+  const AUTH = 'https://api.prod.whoop.com/oauth/oauth2/auth';
+  const REDIRECT = 'https://www.g23f-insider.ch/whoop.html';
+  const SCOPES = 'offline read:recovery read:cycles read:sleep read:workout';
+  const $ = id => document.getElementById(id);
+  const store = { get(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } }, set(k,v){ try { sessionStorage.setItem(k,v); } catch(e){} } };
+  const q = new URLSearchParams(location.search);
+  const code = q.get('code'), error = q.get('error'), state = q.get('state');
+  // Code nicht in der Adresszeile und im Verlauf stehen lassen
+  if (code || error) history.replaceState(null, '', location.pathname);
+
+  if (code) {
+    $('start').hidden = true; $('got').hidden = false;
+    $('code').value = code;
+    const expected = store.get('whoop-state');
+    if (!expected || expected !== state) $('warn').hidden = false;
+    $('copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(code); }
+      catch (e) { $('code').select(); document.execCommand('copy'); }
+      $('copy').textContent = 'Kopiert ✓';
+    };
+    return;
+  }
+  if (error) {
+    $('start').hidden = true; $('fail').hidden = false;
+    $('failmsg').textContent = error === 'access_denied' ? 'Du hast den Zugriff nicht erlaubt.' : 'WHOOP meldet: ' + (q.get('error_description') || error);
+    return;
+  }
+  $('go').onclick = () => {
+    const cid = $('cid').value.trim();
+    if (!cid) { $('cid').focus(); return; }
+    const s = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
+    store.set('whoop-state', s);
+    const u = new URL(AUTH);
+    u.searchParams.set('client_id', cid);
+    u.searchParams.set('redirect_uri', REDIRECT);
+    u.searchParams.set('response_type', 'code');
+    u.searchParams.set('scope', SCOPES);
+    u.searchParams.set('state', s);
+    location.href = u.toString();
+  };
+})();
+</script>
+</body>
+</html>
