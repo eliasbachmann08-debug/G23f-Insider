@@ -1,194 +1,246 @@
 <!DOCTYPE html>
-<html lang="de-CH">
+<html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>G23f-Insider</title>
-  <meta name="theme-color" content="#8B7355">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="G23f-Insider">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="icon" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="manifest" href="manifest.json">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
-  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
-  <link rel="modulepreload" href="app.js?v=2026-08-21-3">
-  <link rel="modulepreload" href="shared/firebase.js">
-  <link rel="modulepreload" href="shared/shell.js">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap">
-  <link rel="stylesheet" href="styles.css?v=2026-08-21-3">
-  <link rel="stylesheet" href="shared/shell.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G23f-Insider</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#8B7355">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="G23f-Insider">
+<style>
+:root {
+  --bg: #F5F1EA;
+  --surface: #FFFDF9;
+  --border: #E0D7CC;
+  --accent: #8B7355;
+  --text: #1A1714;
+  --muted: #6F675E;
+  --radius: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(245,241,234,.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: .9rem 2.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.05rem; color: var(--accent); letter-spacing: -.01em;
+}
+.nav-links { display: flex; gap: 1.8rem; list-style: none; }
+.nav-links a {
+  font-size: .8rem; font-weight: 500; color: var(--muted);
+  text-decoration: none; transition: color .2s; letter-spacing: .01em;
+}
+.nav-links a:hover { color: var(--text); }
+
+/* ── HERO ── */
+.hero {
+  max-width: 1100px; margin: 0 auto; width: 100%;
+  padding: 3.5rem 2.5rem 3.5rem;
+  display: flex; flex-direction: column; gap: 0;
+  position: relative;
+}
+.hero h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.8rem, 6vw, 4.5rem);
+  font-weight: 400; line-height: 1.08;
+  letter-spacing: -.03em; color: var(--text);
+  margin-bottom: 1.2rem;
+}
+.hero h1 em {
+  font-style: italic; color: var(--accent);
+}
+.hero-sub {
+  font-size: .92rem; color: var(--muted);
+  max-width: 460px; line-height: 1.7;
+}
+/* large decorative number */
+.hero-deco {
+  position: absolute; right: 2.5rem; top: 3.5rem;
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(6rem, 12vw, 10rem);
+  font-weight: 400; color: rgba(139,115,85,.07);
+  line-height: 1; letter-spacing: -.05em;
+  user-select: none; pointer-events: none;
+}
+
+/* ── BANNERS ── */
+.sp-wrap {
+  max-width: 1100px; margin: 0 auto; width: 100%;
+  padding: 0 2.5rem 1.2rem;
+}
+.sp-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center; gap: 1.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.8rem;
+  text-decoration: none; color: var(--text);
+  transition: all .22s;
+  position: relative; overflow: hidden;
+}
+.sp-banner::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--banner-color, #c8860a);
+}
+.sp-banner:hover {
+  border-color: color-mix(in srgb, var(--banner-color, #c8860a) 40%, transparent);
+  box-shadow: 0 4px 28px rgba(0,0,0,.06);
+  transform: translateY(-1px);
+}
+.sp-icon { font-size: 1.9rem; line-height: 1; }
+.sp-label {
+  font-size: .64rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--banner-color, #a86800); margin-bottom: .2rem;
+}
+.sp-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.18rem; letter-spacing: -.01em; margin-bottom: .18rem;
+}
+.sp-desc { font-size: .8rem; color: var(--muted); line-height: 1.5; }
+.sp-arrow {
+  font-size: 1rem; color: var(--border);
+  transition: all .2s;
+}
+.sp-banner:hover .sp-arrow { color: var(--banner-color, #c8860a); transform: translateX(4px); }
+
+/* ── DIVIDER ── */
+.divider {
+  max-width: 1100px; margin: 0 auto; width: 100%;
+  padding: 0 2.5rem;
+  margin-bottom: 1.2rem;
+}
+.divider-line {
+  height: 1px; background: var(--border);
+}
+
+/* ── DISCLAIMER ── */
+.disclaimer {
+  max-width: 1100px; margin: 0 auto; width: 100%;
+  padding: .5rem 2.5rem 2rem;
+}
+.disclaimer p {
+  font-size: .73rem; color: var(--muted);
+  line-height: 1.65; opacity: .75;
+}
+.disclaimer strong { color: var(--muted); font-weight: 600; }
+
+/* ── FOOTER ── */
+footer {
+  margin-top: auto;
+  text-align: center; padding: 1.3rem 2rem;
+  color: var(--muted); font-size: .74rem;
+  border-top: 1px solid var(--border); letter-spacing: .01em;
+}
+
+/* ── FADE UP ── */
+.fade-up {
+  opacity: 0; transform: translateY(16px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.fade-up.visible { opacity: 1; transform: translateY(0); }
+
+/* ── RESPONSIVE ── */
+@media(max-width: 700px) {
+  header { padding: .75rem 1.25rem; }
+  .nav-links { display: none; }
+  .hero { padding: 3rem 1.25rem 2.5rem; }
+  .hero-deco { display: none; }
+  .sp-wrap { padding: 0 1.25rem 1rem; }
+  .sp-desc { display: none; }
+  .divider { padding: 0 1.25rem; }
+  .disclaimer { padding: .5rem 1.25rem 1.5rem; }
+}
+</style>
 </head>
 <body>
-  <header class="site-header">
-    <a class="logo" href="./" aria-label="G23f-Insider Startseite">G23f-Insider</a>
-    <nav class="main-nav" id="main-nav" hidden>
-      <a href="stundenplan/">Stundenplan</a><a href="notes/">Notes</a><a href="faecher/">Fächer</a><a href="maturareise/">Maturareise</a>
-    </nav>
-    <div class="header-tools" id="header-tools" hidden>
-      <button class="install-btn" id="install-btn" type="button" aria-label="G23f-Insider als App installieren">⬇ <span>App installieren</span></button>
-      <button type="button" data-g23f-admin hidden aria-label="Admin-Inbox">📥</button>
-      <button type="button" data-g23f-profile hidden aria-label="Eigenes Profil öffnen"></button>
+
+<header>
+  <div class="logo">G23f-Insider</div>
+  <nav><ul class="nav-links">
+    <li><a href="stundenplan/index.html">Stundenplan</a></li>
+    <li><a href="quinsider/index.html">Quinsider Beta</a></li>
+  </ul></nav>
+</header>
+
+<div class="hero fade-up">
+  <div class="hero-deco">G23f</div>
+  <h1>D Lernplattform<br><em>vo üsere klass.</em></h1>
+  <p class="hero-sub">Interaktivi Lernapps, Zämefassige ond üse gmeinsami Stondeplan, alles a eim Ort. (wer brucht scho schuelnetz)</p>
+</div>
+
+<!-- STUNDENPLAN BANNER -->
+<div class="sp-wrap fade-up" style="transition-delay:.1s">
+  <a href="stundenplan/index.html" class="sp-banner" style="--banner-color:#c8860a">
+    <div class="sp-icon">📅</div>
+    <div>
+      <div class="sp-label">Klasse</div>
+      <div class="sp-title">Stundenplan</div>
+      <div class="sp-desc">Huusufgabe, Tests &amp; Organisatorischs, zäme iträge ond emmer aktuell.</div>
     </div>
-  </header>
+    <div class="sp-arrow">→</div>
+  </a>
+</div>
 
-  <main>
-    <section class="auth-gate" id="auth-gate">
-      <div class="auth-panel" id="auth-login">
-        <div class="auth-icon">🔐</div>
-        <p class="eyebrow">G23f-Insider</p>
-        <h1>Anmelden</h1>
-        <p class="auth-lead">Melde dich mit deinem persönlichen Klassenkonto an.</p>
-        <form class="auth-card" id="login-form" novalidate>
-          <label for="login-email">E-Mail</label>
-          <input id="login-email" type="email" autocomplete="email" placeholder="vorname@beispiel.ch" required>
-          <label for="login-password">Persönliches Passwort</label>
-          <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" required>
-          <p class="form-error" id="login-error" role="alert"></p>
-          <button class="primary-btn" id="login-submit" type="submit">Anmelden →</button>
-          <button class="forgot-password-btn" id="forgot-password-btn" type="button">Passwort vergessen?</button>
-          <div class="register-callout">
-            <strong>Noch kein Konto?</strong>
-            <span>Dann musst du dich zuerst mit dem Klassenpasswort registrieren.</span>
-            <button class="register-start-btn" id="show-register-btn" type="button">Jetzt registrieren</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="auth-panel" id="auth-register" hidden>
-        <div class="auth-icon">✨</div>
-        <p class="eyebrow">Einmalige Registrierung</p>
-        <h1>Konto erstellen</h1>
-        <p class="auth-lead">Ohne Klassenpasswort kann kein Konto erstellt werden.</p>
-        <form class="auth-card" id="register-form" novalidate>
-          <label for="register-name">Echter Vorname</label>
-          <input id="register-name" type="text" maxlength="24" autocomplete="given-name" placeholder="z. B. Calvin" required>
-          <p class="field-help">Der Vorname ist deine eindeutige Klassen-ID. Schreib ihn deshalb richtig.</p>
-          <label for="register-email">E-Mail</label>
-          <input id="register-email" type="email" autocomplete="email" placeholder="vorname@beispiel.ch" required>
-          <label for="register-password">Persönliches Passwort</label>
-          <input id="register-password" type="password" minlength="6" autocomplete="new-password" placeholder="Mindestens 6 Zeichen" required>
-          <label for="register-class-password">Klassenpasswort</label>
-          <input id="register-class-password" type="password" autocomplete="off" placeholder="Klassenpasswort" required>
-          <p class="field-help spam-help"><strong>Wichtig, SPAM-ORDNER prüfen:</strong> Die Bestätigungsmail landet häufig dort. Prüfe ihn direkt, falls die Mail nicht erscheint.</p>
-          <p class="form-error" id="register-error" role="alert"></p>
-          <button class="primary-btn" id="register-submit" type="submit">Konto erstellen →</button>
-          <button class="text-btn" id="show-login-btn" type="button">Schon ein Konto? Anmelden</button>
-        </form>
-      </div>
-
-      <div class="auth-panel" id="auth-join" hidden>
-        <div class="auth-icon">🔑</div>
-        <p class="eyebrow">Einmalige Umstellung</p>
-        <h1>Konto freischalten</h1>
-        <p class="auth-lead">Ein älteres Konto muss einmalig mit dem Klassenpasswort bestätigt werden.</p>
-        <form class="auth-card" id="join-form" novalidate>
-          <label for="join-name">Echter Vorname</label>
-          <input id="join-name" type="text" maxlength="24" autocomplete="given-name" placeholder="z. B. Calvin" required>
-          <label for="join-class-password">Klassenpasswort</label>
-          <input id="join-class-password" type="password" autocomplete="off" required>
-          <p class="form-error" id="join-error" role="alert"></p>
-          <button class="primary-btn" id="join-submit" type="submit">Freischalten →</button>
-          <button class="text-btn" id="join-logout-btn" type="button">Mit einem anderen Konto anmelden</button>
-        </form>
-      </div>
-    </section>
-
-    <div id="app-content" hidden>
-      <section class="hero">
-        <div class="hero-deco">G23f</div>
-        <p class="eyebrow">Alles an einem Ort</p>
-        <h1>D Lernplattform<br><em>vo üsere Klass.</em></h1>
-        <p class="hero-sub">Interaktivi Lernapps, dini private Notes, üse Stondeplan ond d Planig vo de Maturareis.</p>
-      </section>
-
-      <section class="feature-wrap primary-navigation page-width" aria-label="Hauptbereiche">
-        <a href="faecher/" class="feature-banner subjects-banner"><span class="feature-icon">🧠</span><span><small>Lernapps</small><strong>Fächer</strong><span>Lerninhält ond Üebige noch Fach sortiert.</span></span><b>→</b></a>
-        <a href="stundenplan/" class="feature-banner timetable-banner"><span class="feature-icon">📅</span><span><small>Klasse</small><strong>Stundenplan</strong><span>Huusufgabe, Tests ond Termine, zäme iträge ond emmer aktuell.</span></span><b>→</b></a>
-        <a href="notes/" class="feature-banner notes-banner"><span class="feature-icon">🗒️</span><span><small>Privat</small><strong>G23f-Notes</strong><span>Eigeti Notize, Ordner ond Liste, nor för dech sechtbar.</span></span><b>→</b></a>
-        <a href="maturareise/" class="feature-banner trip-banner"><span class="feature-icon">📄</span><span><small>Sommer 2027</small><strong>Maturareise</strong><span>Idee ond Plän sammle.</span></span><b>→</b></a>
-      </section>
-
-      <section class="dashboard-grid page-width" aria-label="Persönliche Übersicht">
-        <article class="dashboard-card today-card">
-          <div class="section-head"><div><p class="eyebrow">Übersicht</p><h2>Heute &amp; als Nächstes</h2></div><a href="stundenplan/">Alle →</a></div>
-          <div class="compact-list" id="upcoming-list"><p class="empty-copy">Einträge werden geladen …</p></div>
-        </article>
-        <article class="dashboard-card new-card" id="new-card">
-          <div class="section-head"><div><p class="eyebrow">Seit deinem letzten Besuch</p><h2>Neu oder geändert</h2></div></div>
-          <div class="compact-list" id="new-list"><p class="empty-copy">Wird geprüft …</p></div>
-        </article>
-      </section>
-
-      <section class="finder page-width">
-        <div class="section-head finder-head">
-          <div><p class="eyebrow">G23f-Schnellfinder</p><h2>Schnell finden</h2></div>
-          <div class="finder-chips" role="group" aria-label="Schnellauswahl">
-            <button type="button" data-finder="today">Heute</button>
-            <button type="button" data-finder="week">Diese Woche</button>
-            <button type="button" data-finder="test">Nächster Test</button>
-          </div>
-        </div>
-        <div class="global-search" role="search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" autocomplete="off" aria-label="Stundenplan und eigene Notes durchsuchen" placeholder="Stundenplan und eigene Notes durchsuchen"><button id="clear-search" type="button" aria-label="Suche löschen">✕</button></div>
-        <div class="finder-results" id="finder-results" hidden></div>
-      </section>
-
+<!-- QUINSIDER BANNER -->
+<div class="sp-wrap fade-up" style="transition-delay:.15s">
+  <a href="quinsider/index.html" class="sp-banner" style="--banner-color:#7c5cbf">
+    <div class="sp-icon">🃏</div>
+    <div>
+      <div class="sp-label">Lernsets</div>
+      <div class="sp-title">Quinsider Beta</div>
+      <div class="sp-desc">Eigeni Karteikarte-Sets erstelle, teilä ond mit Karteikarten &amp; Lernen übe.</div>
     </div>
-  </main>
+    <div class="sp-arrow">→</div>
+  </a>
+</div>
 
-  <footer class="site-footer" id="site-footer" hidden>
-    <span>G23f-Insider · Alle Rechte vorbehalten</span>
-    <button type="button" data-g23f-feedback>💬 Fehler oder Idee melden</button>
-  </footer>
+<div class="divider fade-up" style="transition-delay:.2s"><div class="divider-line"></div></div>
 
-  <button class="quick-create" id="quick-create-btn" type="button" aria-label="Schnell erstellen" hidden>＋</button>
-  <div class="quick-menu" id="quick-menu" hidden>
-    <a href="stundenplan/?new=1">📅 Stundenplaneintrag</a>
-    <a href="notes/?new=1">🗒️ Private Notiz</a>
+<!-- Fächer-Section ausgeblendet – kann bei Bedarf wieder aktiviert werden
+<section class="section fade-up" id="faecher">
+  <div class="section-head">
+    <span class="section-title">Fächer</span>
+    <div class="section-line"></div>
   </div>
-
-  <div class="install-popup" id="install-popup" hidden><button id="close-install" type="button">✕</button><strong>G23f-Insider als App installieren</strong><p id="install-help">Öffne das Browsermenü und wähle «App installieren».</p></div>
-  <div class="welcome-modal" id="welcome-modal" hidden>
-    <section class="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
-      <div class="onboarding-top">
-        <strong id="onboarding-progress">1/5</strong>
-        <button class="text-btn onboarding-skip" id="onboarding-skip-btn" type="button">Alles überspringen</button>
-      </div>
-      <div class="welcome-icon" id="onboarding-icon" aria-hidden="true">👋</div>
-      <p class="eyebrow" id="onboarding-kicker">Willkomme</p>
-      <h2 id="welcome-title">Härzlech wellkomme bi G23f-Insider!</h2>
-      <p id="onboarding-copy">Do hesch de Stondeplan, Lernapps ond dini private Notes a eim Ort. Wechtig, s Bestätigungsmail landet wahrschinlech im Spam-Ordner.</p>
-      <div class="onboarding-dots" id="onboarding-dots" aria-hidden="true"></div>
-      <div class="onboarding-actions">
-        <button class="secondary-onboarding-btn" id="onboarding-back-btn" type="button" hidden>Zurück</button>
-        <button class="primary-btn" id="onboarding-next-btn" type="button">Weiter →</button>
-      </div>
-    </section>
+  <div class="subject-grid" id="faecher-grid">
+    <div style="color:var(--muted);font-size:.82rem;">Lädt…</div>
   </div>
-  <div class="page-toast" id="page-toast" role="status" aria-live="polite"></div>
-  <div class="loading-layer" id="loading-layer" hidden><div class="spinner"></div><span id="loading-text">Anmeldung wird geprüft …</span></div>
+</section>
+-->
 
-  <script>
-    try {
-      if (localStorage.getItem("g23f-session-expected") === "1") {
-        document.getElementById("auth-gate").hidden = true;
-        document.getElementById("loading-layer").hidden = false;
-      }
-    } catch {}
-    const earlyForgotButton = document.getElementById("forgot-password-btn");
-    earlyForgotButton.addEventListener("click", () => {
-      if (earlyForgotButton.dataset.ready === "true") return;
-      window.g23fForgotPasswordQueued = true;
-      const status = document.getElementById("login-error");
-      status.textContent = "Die Passwortfunktion wird geladen. Danach wird die Mail direkt vorbereitet …";
-      status.classList.add("visible", "success");
-    });
-  </script>
-  <script type="module" src="app.js?v=2026-08-21-3"></script>
+<div class="disclaimer fade-up" style="transition-delay:.22s">
+  <p><strong>Hinweis:</strong> Diese Lernapp ersetzt nicht das Lernen mit den Unterlagen. Die Theorie basiert auf den Unterlagen des Unterrichts und ist nach den Lernzielen der Lehrer geordnet.</p>
+</div>
+
+<footer>G23f-Insider · Alle Rechte vorbehalten · Fragen oder Ergänzungen? Einfach bei Elias melden</footer>
+
+<script>
+window.scrollTo(0, 0);
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.06 });
+document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+</script>
 </body>
 </html>
