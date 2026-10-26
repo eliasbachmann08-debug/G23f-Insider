@@ -55,7 +55,7 @@ const ONBOARDING_STEPS = [
   },
   {
     icon: "🔎", kicker: "Schnell finden", title: "Schnellfinder und Suche",
-    copy: "Mit Heute, Diese Woche und Nächster Test findest du Wichtiges sofort. Die Suche prüft den Stundenplan und deine eigenen Notes. Die Lernapps erreichst du über Fächer."
+    copy: "Mit Heute, Diese Woche und Nächster Test findest du Wichtiges sofort. Die Suche prüft den Stundenplan und deine eigenen Notes. Eigene Lernsets und Karteikarten findest du in Quinsider."
   },
   {
     icon: "✨", kicker: "Gut zu wissen", title: "Profil, Download und Erstellen",
