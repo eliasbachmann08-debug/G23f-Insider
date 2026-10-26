@@ -259,41 +259,12 @@ footer{text-align:center;padding:1.2rem 2rem;color:var(--muted);font-size:.72rem
   </div>
 </header>
 
-<!-- PW SCREEN -->
-<div class="screen active" id="scr-pw">
+<!-- LADEN -->
+<div class="screen active" id="scr-loading">
   <div class="login-wrap">
     <div class="login-icon">🃏</div>
     <h1 class="login-title">Quinsider</h1>
-    <p class="login-sub">Lernsets erstellen, Karteikarten üben und Begriffe schreiben lernen.</p>
-    <div class="login-card">
-      <label class="field-label" for="pw-inp">Klassenpasswort</label>
-      <input class="text-input" type="password" id="pw-inp" placeholder="••••••••" autocomplete="off">
-      <p class="err-msg" id="pw-err">Falsches Passwort.</p>
-      <button class="btn-primary" onclick="doClassPw()">Weiter →</button>
-    </div>
-  </div>
-</div>
-
-<!-- AUTH SCREEN -->
-<div class="screen" id="scr-auth">
-  <div class="login-wrap">
-    <div class="login-icon" id="auth-icon">👤</div>
-    <h1 class="login-title" id="auth-title">Anmelden</h1>
-    <p class="login-sub" id="auth-sub">Mit deinem Konto anmelden.</p>
-    <div class="login-card">
-      <div id="reg-extra" style="display:none;">
-        <label class="field-label">Vorname</label>
-        <input class="text-input" type="text" id="inp-nick" maxlength="20" autocomplete="given-name">
-      </div>
-      <label class="field-label">E-Mail</label>
-      <input class="text-input" type="email" id="auth-email" autocomplete="email">
-      <label class="field-label">Passwort</label>
-      <input class="text-input" type="password" id="auth-pw" autocomplete="current-password" style="margin-bottom:0;">
-      <p class="err-msg" id="auth-err"></p>
-      <button class="btn-primary" id="auth-btn" onclick="doAuth()">Anmelden →</button>
-      <p class="auth-switch" id="sw-to-reg">Noch kein Konto? <a onclick="switchMode(true)">Registrieren</a></p>
-      <p class="auth-switch" id="sw-to-login" style="display:none;">Schon ein Konto? <a onclick="switchMode(false)">Anmelden</a></p>
-    </div>
+    <p class="login-sub">Klassenkonto wird geladen …</p>
   </div>
 </div>
 
@@ -321,7 +292,7 @@ footer{text-align:center;padding:1.2rem 2rem;color:var(--muted);font-size:.72rem
       </div>
       <div class="create-field">
         <label class="field-label">Titel</label>
-        <input type="text" id="set-title-inp" placeholder="z.B. Französisch Vokabeln Lektion 5">
+        <input type="text" id="set-title-inp" maxlength="120" placeholder="z.B. Französisch Vokabeln Lektion 5">
       </div>
       <div class="create-field">
         <label class="field-label">Beschreibung <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem;">(optional)</span></label>
@@ -472,16 +443,13 @@ footer{text-align:center;padding:1.2rem 2rem;color:var(--muted);font-size:.72rem
 <footer>G23f-Insider · Alle Rechte vorbehalten · Fragen oder Ergänzungen? Einfach bei Elias melden</footer>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
-const FB={apiKey:"AIzaSyCe36w6HmFGScPaSjbFRkxrvuD9VCNrqDk",authDomain:"g23f-studenplan.firebaseapp.com",projectId:"g23f-studenplan",storageBucket:"g23f-studenplan.firebasestorage.app",messagingSenderId:"585686898310",appId:"1:585686898310:web:3712285a4380ae380b6307"};
-const app=initializeApp(FB),db=getFirestore(app),auth=getAuth(app);
-await setPersistence(auth,browserLocalPersistence);
+import { collection, addDoc, deleteDoc, doc, onSnapshot, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { auth, db } from "../shared/firebase.js";
+import { requireClassSession } from "../shared/session.js";
 
 const SETS_COLL='quinsider_sets',UCOLL='users';
-const CLASS_PW='zengatron',ADMIN='eliasbachmann08@gmail.com';
+const ADMIN='eliasbachmann08@gmail.com';
 
 let currentUser=null,currentProfile=null,allUsers=[],allSets=[];
 let currentSetId=null;
@@ -497,66 +465,36 @@ function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.re
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 window.closeM=id=>document.getElementById(id).classList.remove('open');
 
-// CLASS PW
-window.doClassPw=function(){
-  if(document.getElementById('pw-inp').value===CLASS_PW){localStorage.setItem('cls_ok','1');document.getElementById('pw-err').style.display='none';show('scr-auth');}
-  else{document.getElementById('pw-inp').classList.add('err');document.getElementById('pw-err').style.display='block';}
-};
-document.getElementById('pw-inp').addEventListener('keydown',e=>{if(e.key==='Enter')window.doClassPw();});
-
-// AUTH
-let isReg=false;
-window.switchMode=function(reg){
-  isReg=reg;
-  if(reg){document.getElementById('auth-icon').textContent='✨';document.getElementById('auth-title').textContent='Konto erstellen';document.getElementById('auth-sub').textContent='Einmalig registrieren.';document.getElementById('reg-extra').style.display='block';document.getElementById('auth-btn').textContent='Registrieren →';document.getElementById('sw-to-reg').style.display='none';document.getElementById('sw-to-login').style.display='block';}
-  else{document.getElementById('auth-icon').textContent='👤';document.getElementById('auth-title').textContent='Anmelden';document.getElementById('auth-sub').textContent='Mit deinem Konto anmelden.';document.getElementById('reg-extra').style.display='none';document.getElementById('auth-btn').textContent='Anmelden →';document.getElementById('sw-to-reg').style.display='block';document.getElementById('sw-to-login').style.display='none';}
-};
-window.doAuth=async function(){
-  const email=document.getElementById('auth-email').value.trim(),pw=document.getElementById('auth-pw').value;
-  const errEl=document.getElementById('auth-err'),btn=document.getElementById('auth-btn');
-  errEl.style.display='none';btn.disabled=true;btn.textContent='…';
-  const ERR={'auth/email-already-in-use':'E-Mail bereits registriert.','auth/invalid-email':'Ungültige E-Mail.','auth/weak-password':'Mind. 6 Zeichen.','auth/user-not-found':'Kein Konto gefunden.','auth/wrong-password':'Falsches Passwort.','auth/invalid-credential':'E-Mail oder Passwort falsch.','auth/too-many-requests':'Zu viele Versuche.'};
-  try{
-    if(isReg){const nick=document.getElementById('inp-nick').value.trim();if(!nick){errEl.textContent='Vorname eingeben.';errEl.style.display='block';btn.disabled=false;btn.textContent='Registrieren →';return;}const cred=await createUserWithEmailAndPassword(auth,email,pw);await setDoc(doc(db,UCOLL,cred.user.uid),{nickname:nick,email,createdAt:Date.now(),photoData:null});}
-    else{await signInWithEmailAndPassword(auth,email,pw);}
-  }catch(e){errEl.textContent=ERR[e.code]||e.message;errEl.style.display='block';btn.disabled=false;btn.textContent=isReg?'Registrieren →':'Anmelden →';}
-};
-document.getElementById('auth-pw').addEventListener('keydown',e=>{if(e.key==='Enter')window.doAuth();});
-
-onAuthStateChanged(auth,async user=>{
-  if(user){
-    currentUser=user;
-    const snap=await getDoc(doc(db,UCOLL,user.uid));
-    currentProfile=snap.exists()?snap.data():{nickname:user.email.split('@')[0],email:user.email,photoData:null};
-    document.getElementById('chip-name').textContent=currentProfile.nickname;
-    document.getElementById('chip-av').src=currentProfile.photoData||avatarUrl(user.email,48);
-    document.getElementById('user-chip').style.display='flex';
-    document.getElementById('logout-btn').style.display='inline-block';
-    loadAllUsers();startListening();show('scr-browse');
-  }else{
-    currentUser=null;currentProfile=null;
-    document.getElementById('user-chip').style.display='none';
-    document.getElementById('logout-btn').style.display='none';
-    if(localStorage.getItem('cls_ok')==='1')show('scr-auth');else show('scr-pw');
-  }
-});
-window.doLogout=async()=>await signOut(auth);
+window.doLogout=async()=>{await signOut(auth);location.replace('../');};
 
 async function loadAllUsers(){try{const snap=await getDocs(collection(db,UCOLL));allUsers=[];snap.forEach(d=>allUsers.push({uid:d.id,...d.data()}));}catch(e){}}
 
 // FIRESTORE
-function canSeeSet(s){
-  const v=s.visibility||'alle';
-  if(v==='alle')return true;
-  if(v==='privat')return s.authorUid===currentUser?.uid||currentUser?.email===ADMIN;
-  if(v==='auswahl'){if(s.authorUid===currentUser?.uid||currentUser?.email===ADMIN)return true;const n=(currentProfile?.nickname||'').toLowerCase();return(s.visibleTo||[]).map(x=>x.toLowerCase()).includes(n);}
-  return true;
+function fbErr(e,what){
+  const c=e?.code||'';
+  if(c==='permission-denied')return`⚠️ ${what}: keine Berechtigung (Firebase-Regeln)`;
+  if(c==='unavailable')return`⚠️ ${what}: keine Verbindung`;
+  return`⚠️ ${what} fehlgeschlagen${c?' ('+c+')':''}`;
 }
+const setSources=new Map();
 function startListening(){
-  onSnapshot(query(collection(db,SETS_COLL),orderBy('createdAt','desc')),snap=>{
-    allSets=[];snap.forEach(d=>{const s={id:d.id,...d.data()};if(canSeeSet(s))allSets.push(s);});
-    renderBrowse();
-  },()=>toast('⚠️ Verbindungsfehler'));
+  const ref=collection(db,SETS_COLL);
+  // Firestore-Regeln filtern keine breite Abfrage. Deshalb wie im Stundenplan
+  // nur die drei Abfragen, die jede Person sehen darf.
+  const sources=[
+    ['alle',query(ref,where('visibility','==','alle'))],
+    ['own',query(ref,where('authorUid','==',currentUser.uid))],
+    ['selected',query(ref,where('visibleToUids','array-contains',currentUser.uid))]
+  ];
+  for(const[name,q]of sources){
+    onSnapshot(q,snap=>{
+      const m=new Map();snap.forEach(d=>m.set(d.id,{id:d.id,...d.data()}));
+      setSources.set(name,m);
+      const merged=new Map();setSources.forEach(src=>src.forEach((v,k)=>merged.set(k,v)));
+      allSets=[...merged.values()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      renderBrowse();
+    },e=>{console.error('Quinsider: Sets laden ('+name+')',e);toast(fbErr(e,'Sets laden'));});
+  }
 }
 
 // BROWSE
@@ -596,7 +534,7 @@ window.showDetail=function(id){
 };
 window.deleteSet=async function(id){
   if(!confirm('Dieses Set wirklich löschen?'))return;
-  await deleteDoc(doc(db,SETS_COLL,id));showBrowse();toast('Set gelöscht');
+  try{await deleteDoc(doc(db,SETS_COLL,id));showBrowse();toast('Set gelöscht');}catch(e){console.error('Quinsider: Löschen',e);toast(fbErr(e,'Löschen'));}
 };
 
 // CREATE / EDIT
@@ -636,12 +574,14 @@ window.saveSet=async function(){
   const terms=[];
   rows.forEach(r=>{const inps=r.querySelectorAll('.term-inp');const w=inps[0].value.trim(),d=inps[1].value.trim();if(w||d)terms.push({word:w,definition:d});});
   if(!terms.length){toast('⚠️ Bitte mindestens einen Begriff eintragen');return;}
-  const data={title,description:document.getElementById('set-desc-inp').value.trim(),terms,visibility:setVis_,visibleTo:setVis_==='auswahl'?setPersons:[],authorUid:currentUser.uid,authorName:currentProfile.nickname,authorEmail:currentUser.email,updatedAt:Date.now()};
+  const visibleTo=setVis_==='auswahl'?setPersons:[];
+  const visibleToUids=visibleTo.map(n=>allUsers.find(u=>(u.nickname||'').toLowerCase()===n.toLowerCase())?.uid).filter(Boolean);
+  const data={title,description:document.getElementById('set-desc-inp').value.trim(),terms,visibility:setVis_,visibleTo,visibleToUids,updatedAt:Date.now()};
   try{
     if(editSetId){await updateDoc(doc(db,SETS_COLL,editSetId),data);toast('✓ Set aktualisiert');}
-    else{data.createdAt=Date.now();await addDoc(collection(db,SETS_COLL),data);toast('✓ Set erstellt');}
+    else{await addDoc(collection(db,SETS_COLL),{...data,authorUid:currentUser.uid,authorName:currentProfile.nickname||'',authorEmail:currentUser.email||'',createdAt:Date.now()});toast('✓ Set erstellt');}
     showBrowse();
-  }catch(e){toast('⚠️ Fehler beim Speichern');}
+  }catch(e){console.error('Quinsider: Speichern',e);toast(fbErr(e,'Speichern'));}
 };
 
 // VIS
@@ -797,7 +737,18 @@ window.nextLearn=function(){renderLearnCard();};
 window.currentSetId=null;
 Object.defineProperty(window,'currentSetId',{get:()=>currentSetId,set:v=>{currentSetId=v;}});
 
-if(localStorage.getItem('cls_ok')==='1')show('scr-auth');
+// START: gleiche Anmeldung wie Stundenplan und Notes
+const session=await requireClassSession('../');
+if(session){
+  currentUser=session.user;currentProfile=session.profile;
+  document.getElementById('chip-name').textContent=currentProfile.nickname||'';
+  document.getElementById('chip-av').src=currentProfile.photoData||avatarUrl(currentUser.email,48);
+  document.getElementById('user-chip').style.display='flex';
+  document.getElementById('logout-btn').style.display='inline-block';
+  await loadAllUsers();
+  startListening();
+  show('scr-browse');
+}
 </script>
 </body>
 </html>

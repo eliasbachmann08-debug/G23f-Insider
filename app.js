@@ -311,7 +311,7 @@ function safeReturnTarget() {
   try {
     const target = new URL(value, location.origin);
     if (target.origin !== location.origin) return null;
-    if (!["/stundenplan", "/notes", "/faecher"].some(prefix => target.pathname.startsWith(prefix))) return null;
+    if (!["/stundenplan", "/notes", "/faecher", "/quinsider"].some(prefix => target.pathname.startsWith(prefix))) return null;
     return target.href;
   } catch { return null; }
 }
