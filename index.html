@@ -56,6 +56,7 @@ header {
   padding: 3.5rem 2.5rem 3.5rem;
   display: flex; flex-direction: column; gap: 0;
   position: relative;
+
 }
 .hero h1 {
   font-family: 'DM Serif Display', serif;
@@ -128,10 +129,80 @@ header {
 .divider {
   max-width: 1100px; margin: 0 auto; width: 100%;
   padding: 0 2.5rem;
-  margin-bottom: 1.2rem;
 }
 .divider-line {
   height: 1px; background: var(--border);
+}
+
+/* ── FÄCHER SECTION ── */
+.section {
+  max-width: 1100px; margin: 0 auto; width: 100%;
+  padding: 2rem 2.5rem 1.5rem;
+}
+.section-head {
+  display: flex; align-items: center; gap: .8rem; margin-bottom: 1.2rem;
+}
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: .68rem; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--muted); white-space: nowrap;
+}
+.section-line { flex: 1; height: 1px; background: var(--border); }
+
+/* ── SUBJECT GRID ── */
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: .8rem;
+}
+.subject-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.25rem;
+  text-decoration: none; color: var(--text);
+  transition: all .2s;
+  display: flex; flex-direction: column; gap: .55rem;
+  position: relative; overflow: hidden;
+}
+.subject-card::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--card-color, var(--accent)) 0%, transparent 55%);
+  opacity: 0; transition: opacity .2s;
+}
+.subject-card:hover {
+  border-color: var(--card-color, var(--accent));
+  transform: translateY(-2px);
+  box-shadow: 0 5px 18px rgba(0,0,0,.06);
+}
+.subject-card:hover::after { opacity: .05; }
+.subject-card.inactive {
+  cursor: default; opacity: .48;
+}
+.subject-card.inactive:hover {
+  transform: none; box-shadow: none; border-color: var(--border);
+}
+.subject-card.inactive:hover::after { opacity: 0; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.card-icon { font-size: 1.5rem; line-height: 1; }
+.card-tag {
+  font-size: .6rem; font-weight: 600; letter-spacing: .03em;
+  padding: .15rem .45rem; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--muted);
+}
+.card-tag.ready { background: rgba(45,122,58,.08); color: #2d7a3a; border-color: rgba(45,122,58,.2); }
+.card-tag.soon  { background: rgba(168,104,0,.07);  color: #a86800; border-color: rgba(168,104,0,.18); }
+.card-body h3   { font-size: .92rem; font-weight: 600; letter-spacing: -.01em; }
+.card-body p    { font-size: .74rem; color: var(--muted); line-height: 1.5; margin-top: .18rem; }
+.card-pills {
+  display: flex; gap: .3rem; flex-wrap: wrap;
+  margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--border);
+}
+.card-pill {
+  font-size: .65rem; padding: .12rem .38rem;
+  background: rgba(0,0,0,.03); border: 1px solid var(--border);
+  border-radius: 4px; color: var(--muted);
 }
 
 /* ── DISCLAIMER ── */
@@ -165,11 +236,18 @@ footer {
   header { padding: .75rem 1.25rem; }
   .nav-links { display: none; }
   .hero { padding: 3rem 1.25rem 2.5rem; }
+  .hero::before { left: 1.25rem; }
+  .hero-eyebrow { padding-left: 1rem; }
   .hero-deco { display: none; }
   .sp-wrap { padding: 0 1.25rem 1rem; }
   .sp-desc { display: none; }
+  .section { padding: 1.5rem 1.25rem 1rem; }
   .divider { padding: 0 1.25rem; }
   .disclaimer { padding: .5rem 1.25rem 1.5rem; }
+  .subject-grid { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width: 400px) {
+  .subject-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -180,6 +258,7 @@ footer {
   <nav><ul class="nav-links">
     <li><a href="stundenplan/index.html">Stundenplan</a></li>
     <li><a href="quinsider/index.html">Quinsider Beta</a></li>
+    <li><a href="#faecher">Fächer</a></li>
   </ul></nav>
 </header>
 
@@ -202,7 +281,7 @@ footer {
   </a>
 </div>
 
-<!-- QUINSIDER BANNER -->
+<!-- QUINSIDER BETA BANNER -->
 <div class="sp-wrap fade-up" style="transition-delay:.15s">
   <a href="quinsider/index.html" class="sp-banner" style="--banner-color:#7c5cbf">
     <div class="sp-icon">🃏</div>
@@ -217,8 +296,8 @@ footer {
 
 <div class="divider fade-up" style="transition-delay:.2s"><div class="divider-line"></div></div>
 
-<!-- Fächer-Section ausgeblendet – kann bei Bedarf wieder aktiviert werden
-<section class="section fade-up" id="faecher">
+<!-- FÄCHER SECTION -->
+<section class="section fade-up" style="transition-delay:.22s" id="faecher">
   <div class="section-head">
     <span class="section-title">Fächer</span>
     <div class="section-line"></div>
@@ -227,9 +306,8 @@ footer {
     <div style="color:var(--muted);font-size:.82rem;">Lädt…</div>
   </div>
 </section>
--->
 
-<div class="disclaimer fade-up" style="transition-delay:.22s">
+<div class="disclaimer fade-up" style="transition-delay:.26s">
   <p><strong>Hinweis:</strong> Diese Lernapp ersetzt nicht das Lernen mit den Unterlagen. Die Theorie basiert auf den Unterlagen des Unterrichts und ist nach den Lernzielen der Lehrer geordnet.</p>
 </div>
 
@@ -241,6 +319,27 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.06 });
 document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+
+fetch('faecher/faecher.json')
+  .then(r => r.json())
+  .then(faecher => {
+    faecher.sort((a,b) => b.verfuegbar - a.verfuegbar);
+    document.getElementById('faecher-grid').innerHTML = faecher.map(f => {
+      if(f.verfuegbar){
+        const pills = (f.themen||[]).map(t=>`<span class="card-pill">${t}</span>`).join('');
+        return `<a href="${f.pfad}" class="subject-card" style="--card-color:${f.color}">
+          <div class="card-top"><div class="card-icon">${f.icon}</div><div class="card-tag ready">✓ Verfügbar</div></div>
+          <div class="card-body"><h3>${f.name}</h3><p>${f.beschreibung||'Lernmaterial verfügbar.'}</p></div>
+          ${pills?`<div class="card-pills">${pills}</div>`:''}
+        </a>`;
+      }
+      return `<div class="subject-card inactive" style="--card-color:${f.color}">
+        <div class="card-top"><div class="card-icon">${f.icon}</div><div class="card-tag soon">Bald</div></div>
+        <div class="card-body"><h3>${f.name}</h3><p>Wird hinzugefügt, sobald das Thema behandelt wird.</p></div>
+      </div>`;
+    }).join('');
+  })
+  .catch(()=>{ document.getElementById('faecher-grid').innerHTML='<div style="color:var(--muted);font-size:.82rem;">Fächer konnten nicht geladen werden.</div>'; });
 </script>
 </body>
 </html>
