@@ -27,6 +27,10 @@ const FALLBACK_SUBJECTS = [
   "Schwerpunktfach Mathe", "Schwerpunktfach Physik"
 ];
 
+// Nur für Stundenplan-Einträge. Sie stehen bewusst nicht in faecher.json,
+// damit sie auf der Fächer-Seite nicht als Lernapp-Karte erscheinen.
+const EXTRA_SUBJECTS = ["Ergänzungsfach", "Sonstiges"];
+
 const TYPE_META = {
   hausaufgabe: { short: "HA", long: "Hausaufgabe", icon: "✏️" },
   test: { short: "Test", long: "Test / Prüfung", icon: "📝" },
@@ -443,6 +447,7 @@ async function loadSubjects() {
   } catch {
     subjects = [...FALLBACK_SUBJECTS];
   }
+  subjects = [...new Set([...subjects, ...EXTRA_SUBJECTS])];
   $("entry-subject").innerHTML = subjects.map(subject => `<option value="${escapeHTML(subject)}">${escapeHTML(subject)}</option>`).join("");
 }
 
